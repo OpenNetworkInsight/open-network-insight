@@ -105,7 +105,7 @@ Our Central repository for our Open Network Insight solution is found here. If y
 
 Help us improve ONI!
 
-ONI is Apache 2.0 licensed and accepts contribuitions via GitHub pull requests. Please follow the next steps
+ONI is Apache 2.0 licensed and accepts contributions via GitHub pull requests. Please follow the next steps
 and join our comunity.
 
 ### **Contribuiting to ONI code**
