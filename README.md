@@ -76,6 +76,8 @@ ONI can be installed by following our installation manual. To get started, [chec
 
 the **master** branch will always be the latest stable release, while current code development will be done in **dev**
 
+**warning** the dev branch is not recommended for a production environment and should only be used for testing
+
 ## If you want all of the ONI code at once, just clone it!
         git clone --recursive https://github.com/Open-Network-Insight/open-network-insight.git
 
