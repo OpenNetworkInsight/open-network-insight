@@ -64,6 +64,18 @@ pull the code from [oni-demo repo](https://github.com/Open-Network-Insight/oni-d
 
 ONI can be installed by following our installation manual. To get started, [check out the installation instructions in the documentation](https://github.com/Open-Network-Insight/open-network-insight/wiki).
 
+## Branches
+
+**stable release**
+
+* master
+
+**latest**
+
+* dev
+
+the **master** branch will always be the latest stable release, while current code development will be done in **dev**
+
 ## If you want all of the ONI code at once, just clone it!
         git clone --recursive https://github.com/Open-Network-Insight/open-network-insight.git
 
