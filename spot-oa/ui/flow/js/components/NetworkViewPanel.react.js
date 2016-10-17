@@ -1,5 +1,4 @@
 const React = require('react');
-const Base64 = require('js-base64').Base64;
 
 const ContentLoaderMixin = require('../../../js/components/ContentLoaderMixin.react');
 const ChartMixin = require('../../../js/components/ChartMixin.react');
@@ -12,15 +11,13 @@ const SpotConstants = require('../../../js/constants/SpotConstants');
 const SuspiciousStore = require('../stores/SuspiciousStore');
 
 const ID_SEPARATOR = '-';
-const ID_REPLACE = '.';
-const ID_REPLACEMENT = '_';
 
 function createNodeId(id) {
-    return encodeId(`node${ID_SEPARATOR}${id}`);
+    return `node${ID_SEPARATOR}${id}`;
 }
 
 function getIpFromNodeId(id) {
-    return decodeId(id).split(ID_SEPARATOR)[1];
+    return id.split(ID_SEPARATOR)[1];
 }
 
 function getLinkSource(sourceIp, destinationIp) {
@@ -35,23 +32,15 @@ function createLinkId(sourceIp, destinationIp) {
     const srcId = getLinkSource(sourceIp, destinationIp);
     const dstId = getLinkDestination(sourceIp, destinationIp);
 
-    return encodeId(`link${ID_SEPARATOR}${srcId}${ID_SEPARATOR}${dstId}`);
+    return `link${ID_SEPARATOR}${srcId}${ID_SEPARATOR}${dstId}`;
 }
 
 function getSourceIpFromLinkId(id) {
-    return decodeId(id).split(ID_SEPARATOR)[1];
+    return id.split(ID_SEPARATOR)[1];
 }
 
 function getDestinationIpFromLinkId(id) {
-    return decodeId(id).split(ID_SEPARATOR)[2];
-}
-
-function encodeId(id) {
-    return id.replace(new RegExp(`[${ID_REPLACE}]`, 'g'), ID_REPLACEMENT);
-}
-
-function decodeId(id) {
-    return id.replace(new RegExp(`[${ID_REPLACEMENT}]`, 'g'), ID_REPLACE);
+    return id.split(ID_SEPARATOR)[2];
 }
 
 function getNodesFromData(data) {

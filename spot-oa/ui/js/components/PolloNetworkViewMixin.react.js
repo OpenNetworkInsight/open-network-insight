@@ -1,4 +1,16 @@
+const Base64 = require('js-base64').Base64;
 const d3Interpolate = require('d3-interpolate');
+
+const ID_REPLACE = '.';
+const ID_REPLACEMENT = '_';
+
+function encodeId(id) {
+    return id.replace(new RegExp(`[${ID_REPLACE}]`, 'g'), ID_REPLACEMENT);
+}
+
+function decodeId(id) {
+    return id.replace(new RegExp(`[${ID_REPLACEMENT}]`, 'g'), ID_REPLACE);
+}
 
 function getRadious(area) {
     return Math.sqrt(area/Math.PI);
@@ -98,7 +110,7 @@ const PolloNetworkViewMixin = {
     },
     drawNodes(nodes) {
         this.nodesSel = {
-            update: this.canvas.selectAll('.node').data(this.state.data.nodes, n => n.id)
+            update: this.canvas.selectAll('.node').data(this.state.data.nodes, n => encodeId(n.id))
         };
         this.nodesSel.enter = this.nodesSel.update.enter();
 
@@ -106,7 +118,7 @@ const PolloNetworkViewMixin = {
         this.nodesSel.enter
             .append('path', '.edge')
             .classed('node', true)
-            .attr("id", n => n.id )
+            .attr("id", n => encodeId(n.id))
             .attr("d", d3.svg.symbol()
                .size(n => this.nodeSizeScale(n.hits))
                .type(n => this.typeScale(n.internalIp))
@@ -143,12 +155,12 @@ const PolloNetworkViewMixin = {
                 d3.event.stopPropagation();
             })
             .on("click", n => {
-                this._onClick(n.id);
+                this._onClick(decodeId(n.id));
             })
             .on("contextmenu", n => {
                 this.tooltip.hide();
 
-                this._onContextualClick(n.id);
+                this._onContextualClick(decodeId(n.id));
             })
             .on('mouseout', () => {
                 this.tooltip.hide();
@@ -164,7 +176,7 @@ const PolloNetworkViewMixin = {
     },
     drawLinks(links) {
         this.linksSel = {
-            update: this.canvas.selectAll('.edge').data(this.state.data.links, l => l.id)
+            update: this.canvas.selectAll('.edge').data(this.state.data.links, l => encodeId(l.id))
         };
         this.linksSel.enter = this.linksSel.update.enter();
 
@@ -172,7 +184,7 @@ const PolloNetworkViewMixin = {
         this.linksSel.enter
              .append('line')
              .classed('edge', true)
-             .attr("id", l => l.id)
+             .attr("id", l => encodeId(l.id))
              .style('stroke', l => this.linkColorScale(l.weight))
              .style('stroke-opacity', l => this.opacityScale(l.weight));
 
@@ -189,10 +201,12 @@ const PolloNetworkViewMixin = {
         this.canvas.selectAll('.node').classed('node-faded', true);
 
         ids.forEach(id => {
+            id = encodeId(id);
             this.canvas.select(`#${id}.node`).classed("node-faded", false);
         })
     },
     highlightEdge(id) {
+        id = encodeId(id);
         this.canvas.selectAll('.edge').classed('edge-faded', true);
 
         this.canvas.select(`#${id}.edge`)
@@ -211,10 +225,12 @@ const PolloNetworkViewMixin = {
         this.canvas.selectAll('.node').classed('blink_me', false);
 
         ids.forEach((id) => {
+            id = encodeId(id);
             this.canvas.select(`#${id}.node`).classed('blink_me', true);
         });
     },
     selectEdge(id) {
+        id = encodeId(id);
         this.canvas.selectAll('.edge')
             .classed('blink_me', false)
             .filter(`#${id}`)
