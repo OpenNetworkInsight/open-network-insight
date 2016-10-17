@@ -29,8 +29,8 @@ function getDataFromNodeId(id) {
     };
 }
 
-function createLinkId(tld, dst_ip) {
-    return `link${ID_SEPARATOR}tld${TYPE_SEPARATOR}${tld}${ID_SEPARATOR}ip_dst${TYPE_SEPARATOR}${dst_ip}`;
+function createLinkId(tld, ip_dst) {
+    return `link${ID_SEPARATOR}tld${TYPE_SEPARATOR}${tld}${ID_SEPARATOR}ip_dst${TYPE_SEPARATOR}${ip_dst}`;
 }
 
 function getNodesFromData(data) {
@@ -122,7 +122,7 @@ const NetworkViewPanel = React.createClass({
     _onHighlight() {
         const threat = SuspiciousStore.getHighlightedThreat();
 
-        this.highlightNodes([createNodeId('tld', threat.tld), createNodeId('ip', threat.ip_dst)]);
+        this.highlightNodes([createNodeId('tld', threat.tld), createNodeId('ip_dst', threat.ip_dst)]);
         this.highlightEdge(createLinkId(threat.tld, threat.ip_dst));
     },
     _onUnhighlight() {
@@ -131,7 +131,7 @@ const NetworkViewPanel = React.createClass({
     _onSelect() {
         const threat = SuspiciousStore.getSelectedThreat();
 
-        this.selectNodes([createNodeId('tld', threat.tld), createNodeId('ip', threat.ip_dst)]);
+        this.selectNodes([createNodeId('tld', threat.tld), createNodeId('ip_dst', threat.ip_dst)]);
         this.selectEdge(createLinkId(threat.tld, threat.ip_dst));
     },
     _onClick(id) {
