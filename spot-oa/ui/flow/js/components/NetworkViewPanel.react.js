@@ -136,7 +136,7 @@ const NetworkViewPanel = React.createClass({
         this.selectEdge(createLinkId(threat.srcIP, threat.dstIP));
     },
     _onClick(id) {
-        const ip = getIpFromNodeId(id)
+        const ip = getIpFromNodeId(id);
         EdInActions.selectIp(ip);
         SpotActions.toggleMode(SpotConstants.DETAILS_PANEL, SpotConstants.VISUAL_DETAILS_MODE);
         EdInActions.reloadVisualDetails();

@@ -1,15 +1,15 @@
 const Base64 = require('js-base64').Base64;
 const d3Interpolate = require('d3-interpolate');
 
-const ID_REPLACE = '.';
+const ID_REPLACE = '=';
 const ID_REPLACEMENT = '_';
 
 function encodeId(id) {
-    return id.replace(new RegExp(`[${ID_REPLACE}]`, 'g'), ID_REPLACEMENT);
+    return Base64.encode(id).replace(new RegExp(`[${ID_REPLACE}]`, 'g'), ID_REPLACEMENT);
 }
 
 function decodeId(id) {
-    return id.replace(new RegExp(`[${ID_REPLACEMENT}]`, 'g'), ID_REPLACE);
+    return Base64.decode(id.replace(new RegExp(`[${ID_REPLACEMENT}]`, 'g'), ID_REPLACE));
 }
 
 function getRadious(area) {
@@ -155,12 +155,12 @@ const PolloNetworkViewMixin = {
                 d3.event.stopPropagation();
             })
             .on("click", n => {
-                this._onClick(decodeId(n.id));
+                this._onClick(n.id);
             })
             .on("contextmenu", n => {
                 this.tooltip.hide();
 
-                this._onContextualClick(decodeId(n.id));
+                this._onContextualClick(n.id);
             })
             .on('mouseout', () => {
                 this.tooltip.hide();
