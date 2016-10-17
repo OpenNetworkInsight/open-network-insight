@@ -35,14 +35,6 @@ function createLinkId(sourceIp, destinationIp) {
     return `link${ID_SEPARATOR}${srcId}${ID_SEPARATOR}${dstId}`;
 }
 
-function getSourceIpFromLinkId(id) {
-    return id.split(ID_SEPARATOR)[1];
-}
-
-function getDestinationIpFromLinkId(id) {
-    return id.split(ID_SEPARATOR)[2];
-}
-
 function getNodesFromData(data) {
     const nodes = {};
 
