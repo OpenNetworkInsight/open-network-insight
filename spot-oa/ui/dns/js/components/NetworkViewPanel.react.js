@@ -62,19 +62,20 @@ function getLinksFromData(data, nodes) {
 
     data.forEach((item, idx) => {
         const id = createLinkId(item.tld, item.ip_dst);
-        const weight = -Math.log(item.score);
+
+        // Items where dns_qry_name is too long, are suspicious according to bussiness rules
+        const score = item.dns_qry_name.length>SUSPICIOUS_QUERY_LENGTH ? Number.MAX_VALUE : -Math.log(item.score);
 
         if (!(id in links)) {
             links[id] = {
                 id: id,
                 source: nodes[createNodeId('tld', item.tld)],
                 target: nodes[createNodeId('ip_dst', item.ip_dst)],
-                // Make sure queries of 64 characters or more are suspicious
-                weight: item.dns_qry_name.length>SUSPICIOUS_QUERY_LENGTH ? Number.MAX_VALUE : weight,
+                score
             };
         }
         else {
-            links[id].weight  = Math.max(links[id].weight, weight)
+            links[id].score  = Math.max(links[id].score, score)
         }
     });
 

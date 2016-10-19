@@ -64,18 +64,18 @@ function getLinksFromData(data, nodes) {
 
     data.forEach((item) => {
         const id = createLinkId(item.srcIP, item.dstIP);
-        const weight = -Math.log(item.lda_score);
+        const score = -Math.log(item.lda_score);
 
         if (!(id in links)) {
             links[id] = {
                 id: id,
                 source: nodes[createNodeId(getLinkSource(item.srcIP, item.dstIP))],
                 target: nodes[createNodeId(getLinkDestination(item.srcIP, item.dstIP))],
-                weight: weight,
+                score
             };
         }
         else {
-            links[id].weight  = Math.max(links[id].weight, weight)
+            links[id].score  = Math.max(links[id].score, score)
         }
     });
 

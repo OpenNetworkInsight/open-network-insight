@@ -185,8 +185,8 @@ const PolloNetworkViewMixin = {
              .append('line')
              .classed('edge', true)
              .attr("id", l => encodeId(l.id))
-             .style('stroke', l => this.linkColorScale(l.weight))
-             .style('stroke-opacity', l => this.opacityScale(l.weight));
+             .style('stroke', l => this.linkColorScale(l.score))
+             .style('stroke-opacity', l => this.opacityScale(l.score));
 
         // Update links
         this.linksSel.update
