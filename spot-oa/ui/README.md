@@ -841,7 +841,7 @@ _SPOT/ui/js/flow/components/_
 
     See [SuspiciousGridMixin.react.js](#suspiciousgridmixin.react.js)
 
-- NetworkPanel.react.js
+- NetworkViewPanel.react.js
 - DetailsPanel.react.js
 - DetailsTablePanel.react.js
 
@@ -873,7 +873,7 @@ _SPOT/ui/js/dns/components/_
 
     See [SuspiciousGridMixin.react.js](#suspiciousdendrogrampanel.react.js)
 
-- NetworkPanel.react.js
+- NetworkViewPanel.react.js
 - DetailsPanel.react.js
 - DetailsTablePanel.react.js
 - DetailsDendrogramPanel.react.js
