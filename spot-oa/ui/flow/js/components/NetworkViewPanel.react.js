@@ -37,6 +37,7 @@ function createLinkId(sourceIp, destinationIp) {
 
 function getNodesFromData(data) {
     const nodes = {};
+    const mapper = {srcIP: 'srcIpInternal', dstIP: 'destIpInternal'};
 
     data.forEach((item) => {
         ['srcIP', 'dstIP'].forEach((field) => {
@@ -46,7 +47,7 @@ function getNodesFromData(data) {
                 nodes[id] = {
                     id: id,
                     label: item[field],
-                    internalIp: item[`${field}Internal`]==='1',
+                    internalIp: item[mapper[field]]==='1',
                     hits: 1
                 };
             }
