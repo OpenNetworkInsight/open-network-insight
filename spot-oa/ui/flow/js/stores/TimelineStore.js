@@ -11,14 +11,16 @@ var filterName;
 
 var TimelineStore = assign(new RestStore(FlowConstants.API_TIMELINE), {
     _parser: d3.tsv,
-    _sdate:'',
     errorMessages: {
         404: 'Please choose a different date, no data has been found'
     },
     setDate: function (date)
     {
         this.setEndpoint(FlowConstants.API_TIMELINE.replace('${date}', date.replace(/-/g, '')));
-        this._sdate = date;
+        this._date = date;
+    },
+    getDate() {
+        return this._date;
     },
     setFilter: function (name, value)
     {
