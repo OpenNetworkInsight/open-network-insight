@@ -1,6 +1,6 @@
-var $ = require('jquery');
-var d3 = require('d3');
-var React = require('react');
+const $ = require('jquery');
+const d3 = require('d3');
+const React = require('react');
 
 const colorScale = d3.scale.category10();
 
@@ -20,33 +20,54 @@ const locale = d3.locale({
 
 const TimelineMixin = {
     buildChart() {
-        this.canvas = d3.select(this.getDOMNode()).select('div')
-                .datum(this.state.data);
+        this.canvas = d3.select(this.getDOMNode()).select('*').datum(this.state.data);
 
         const dataDate = this.state.date;
         const startTime = Date.parse(dataDate + " 00:00");
         const endTime = Date.parse(dataDate + " 23:59");
 
         this.eventDropsChart = d3.chart.eventDrops()
-            .start(new Date(startTime))
-            .end(new Date(endTime))
+            .start(startTime)
+            .end(endTime)
             .locale(locale)
-            .eventColor(e => colorScale(e.name))
-            .labelsWidth(100)
             .axisFormat(xAxis => xAxis.ticks(5))
-            .date(e => new Date(e.date));
+            .eventLineColor(e => colorScale(e.name));
 
         if (this.getTooltipContent) {
             // Create a tooltip
             this.tooltip = d3.tip()
                 .attr('class', 'd3-tip')
-                .html(e => this.getTooltipContent(e));
+                .html(d => this.getTooltipContent(d));
 
-            this.eventDropsChart.mouseover(this.tooltip.show);
-            this.eventDropsChart.mouseout(this.tooltip.hide);
+            this.eventDropsChart.eventHover((e) => {
+                const eventData = d3.select(e).data()[0];
+                // Get data from event's parent. Super relying on eventDrops implementation
+                const parentData = d3.select($(e).parent().get(0)).data()[0];
+
+                // Hide tooltip when mouse leaves event node.
+                // d3 will remove the event handler before adding
+                // the new one. So good!!!
+                /*d3.select(e).on('mouseleave', function () {
+                    this.tooltip.hide();
+                });
+                d3.select($(e).parent().get(0)).on('mouseleave', function () {
+                    this.tooltip.hide();
+                });*/
+
+                // Show tooltip
+                const tooltipData = {
+                    context: parentData,
+                    date: eventData.toLocaleTimeString()
+                };
+
+                this.tooltip.show(tooltipData, e);
+            });
         }
     },
     draw() {
+        // Get current viewport width
+        this.eventDropsChart.width($(this.getDOMNode()).width())
+
         // Create svg element and draw eventDropsChart
         this.canvas.call(this.eventDropsChart);
 

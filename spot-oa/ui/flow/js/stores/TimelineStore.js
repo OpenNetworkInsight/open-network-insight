@@ -1,15 +1,14 @@
-var assign = require('object-assign');
+const assign = require('object-assign');
+const d3 = require('d3');
 
-var SpotDispatcher = require('../../../js/dispatchers/SpotDispatcher');
-var FlowConstants = require('../constants/NetflowConstants');
-var SpotConstants = require('../../../js/constants/SpotConstants');
-var RestStore = require('../../../js/stores/RestStore');
+const SpotDispatcher = require('../../../js/dispatchers/SpotDispatcher');
+const FlowConstants = require('../constants/NetflowConstants');
+const SpotConstants = require('../../../js/constants/SpotConstants');
+const RestStore = require('../../../js/stores/RestStore');
 
-var fields = ['title', 'summary'];
-var filterName;
+const FILTER_NAME = 'ip';
 
-
-var TimelineStore = assign(new RestStore(FlowConstants.API_TIMELINE), {
+const TimelineStore = assign(new RestStore(FlowConstants.API_TIMELINE), {
     _parser: d3.tsv,
     errorMessages: {
         404: 'Please choose a different date, no data has been found'
@@ -22,22 +21,17 @@ var TimelineStore = assign(new RestStore(FlowConstants.API_TIMELINE), {
     getDate() {
         return this._date;
     },
-    setFilter: function (name, value)
+    setFilter: function (value)
     {
-        filterName = name;
-        this.setRestFilter('id', value);
+        this.setRestFilter(FILTER_NAME, value);
     },
-    getFilterName: function ()
+    getFilter: function ()
     {
-        return filterName;
-    },
-    getFilterValue: function ()
-    {
-        return this.getRestFilter('id');
+        return this.getRestFilter(FILTER_NAME);
     },
     clearFilter: function ()
     {
-       this.removeRestFilter('id');
+       this.removeRestFilter(FILTER_NAME);
     }
 });
 
@@ -49,26 +43,7 @@ SpotDispatcher.register(function (action) {
 
             break;
         case SpotConstants.SELECT_COMMENT:
-            var comment, filterParts, key;
-
-            TimelineStore.clearFilter();
-
-            comment = action.comment;
-
-            filterParts = [];
-
-            for (key in comment)
-            {
-                // Skip comment fields
-                if (fields.indexOf(key)>=0) continue;
-
-                if (comment[key])
-                {
-                    TimelineStore.setFilter(key, comment[key]);
-
-                    break;
-                }
-            }
+            TimelineStore.setFilter(action.comment.ip);
 
             TimelineStore.reload();
 

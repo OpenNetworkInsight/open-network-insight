@@ -5,7 +5,7 @@ const ContentLoaderMixin = require('../../../js/components/ContentLoaderMixin.re
 const TimelineStore = require('../stores/TimelineStore');
 const TimelineMixin = require('../../../js/components/TimelineMixin.react');
 
-var TimelinePanel = React.createClass({
+const TimelineChart = React.createClass({
     mixins: [ContentLoaderMixin, ChartMixin, TimelineMixin],
     componentDidMount: function ()
     {
@@ -33,7 +33,6 @@ var TimelinePanel = React.createClass({
     {
         const state = {
             loading: false,
-            name: TimelineStore.getFilterValue(),
             date: TimelineStore.getDate(),
             data: {}
         };
@@ -66,60 +65,56 @@ var TimelinePanel = React.createClass({
             array of object values. Turn objects into arrays
         */
 
+        const skipedIp = TimelineStore.getFilter();
         data.forEach(item => {
             [
                 {ipField:'srcip', portField:'sport'},
                 {ipField:'dstip', portField:'dport'}
             ].forEach(({ipField, portField}) => {
-                var id, ip, port;
+                const ip = item[ipField];
 
-                ip = item[ipField];
-                port = item[portField];
-
-                if (ip==state.name) return;
+                if (ip==skipedIp) return;
 
                 if (!state.data[ip]) {
                     state.data[ip] = {
                         name: ip,
-                        data: {}
-                    };
-                }
-
-                id = item.tstart.substr(0, 16);
-                if (!state.data[ip].data[id]) {
-                    state.data[ip].data[id] = {
-                        name: ip,
-                        date: id,
+                        dates: {},
                         ports: {}
                     };
                 }
 
-                if (!state.data[ip].data[id].ports[port]) {
-                    state.data[ip].data[id].ports[port]=0;
+                const date = item.tstart.substr(0, 16);
+                if (!state.data[ip].dates[date]) {
+                    state.data[ip].dates[date] = new Date(date);
                 }
 
-                state.data[ip].data[id].ports[port]++;
+                const port = item[portField];
+                if (!state.data[ip].ports[port]) {
+                    state.data[ip].ports[port]=0;
+                }
+
+                state.data[ip].ports[port]++;
             });
         });
 
         state.data = Object.keys(state.data).map(ip => {
             // Looking at ip data
-            state.data[ip].data = Object.keys(state.data[ip].data).map((id) => {
+            state.data[ip].dates = Object.keys(state.data[ip].dates).map((date) => {
                 // Looking at date data
 
-                // Find the most referenced port
-                state.data[ip].data[id].port = Object.keys(state.data[ip].data[id].ports).reduce((currentPort, port) => {
-                    if (!currentPort) return port;
-
-                    return state.data[ip].data[id].ports[currentPort]>=state.data[ip].data[id].ports[port] ? currentPort: port;
-                }, null);
-
-                // we have found the most common ports, get rid of port data
-                delete state.data[ip].data[id].ports;
-
                 // Unwrap date data
-                return state.data[ip].data[id];
+                return state.data[ip].dates[date];
             });
+
+            // Find the most referenced port
+            state.data[ip].port = Object.keys(state.data[ip].ports).reduce((currentPort, port) => {
+                if (!currentPort) return port;
+
+                return state.data[ip].ports[currentPort]>=state.data[ip].ports[port] ? currentPort: port;
+            }, null);
+
+            // we have found the most common ports, get rid of port data
+            delete state.data[ip].ports;
 
             // Unwrap ip data
             return state.data[ip];
@@ -127,8 +122,18 @@ var TimelinePanel = React.createClass({
 
         return state;
     },
-    getTooltipContent (e) {
-        return `${e.name}: On ${e.date}, the most used port was ${e.port}`;
+    getTooltipContent (eventData) {
+        return `${eventData.context.name}: At ${eventData.date}, the most used port was ${eventData.context.port}`;
+    }
+});
+
+const TimelinePanel = React.createClass({
+    render() {
+        return (
+            <TimelineChart>
+                <div />
+            </TimelineChart>
+        );
     }
 });
 

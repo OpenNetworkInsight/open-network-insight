@@ -76,9 +76,7 @@ React.render(
           <MapView />
       </Panel>
       <Panel title={SpotConstants.TIMELINE_PANEL} expandable className="col-md-4 timeline" >
-          <TimelinePanel>
-            <div className="event-drops-wrapper" />
-          </TimelinePanel>
+          <TimelinePanel />
       </Panel>
     </PanelRow>
   </div>,
