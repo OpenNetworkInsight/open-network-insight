@@ -18,6 +18,13 @@ const locale = d3.locale({
     "shortMonths": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 });
 
+/*
+    TODO: Upgrade to EventDrops 2.0 or later
+
+    At the momment EventDrops 2.0 is out but the version on npm has a bug that
+    prevents event counter from being displayed.
+ */
+
 const TimelineMixin = {
     buildChart() {
         this.canvas = d3.select(this.getDOMNode()).select('*').datum(this.state.data);
@@ -44,16 +51,6 @@ const TimelineMixin = {
                 // Get data from event's parent. Super relying on eventDrops implementation
                 const parentData = d3.select($(e).parent().get(0)).data()[0];
 
-                // Hide tooltip when mouse leaves event node.
-                // d3 will remove the event handler before adding
-                // the new one. So good!!!
-                /*d3.select(e).on('mouseleave', function () {
-                    this.tooltip.hide();
-                });
-                d3.select($(e).parent().get(0)).on('mouseleave', function () {
-                    this.tooltip.hide();
-                });*/
-
                 // Show tooltip
                 const tooltipData = {
                     context: parentData,
@@ -75,6 +72,32 @@ const TimelineMixin = {
         if (this.getTooltipContent) {
             this.canvas.select('svg').call(this.tooltip);
         }
+
+        /*
+            EventDrops takes a very weird approach to handle de event hover
+            event.
+
+            We follow the same approach to try to hide our tooltip when mouse
+            has leave an event
+        */
+        const tooltipRef = this.tooltip;
+        d3.select(this.getDOMNode()).select('rect.zoom')
+            .on('mousemove.timeline', function () {
+                const zoomRect = d3.select(this);
+
+                zoomRect.attr('display', 'none');
+                const el = document.elementFromPoint(d3.event.clientX, d3.event.clientY);
+                zoomRect.attr('display', 'block');
+
+                if (el.tagName !== 'circle') {
+                    tooltipRef.hide();
+                }
+            })
+            .on('mouseleave.timeline', function () {
+                // Fast movements of the mouse point don't hide the tooltip :(
+                // Use mouseleave as a last resort to hide our tooltip
+                tooltipRef.hide();
+            });
     }
 };
 
