@@ -1,12 +1,13 @@
-var React = require('react');
-var queue = require('d3-queue');
-var GlobeViewStore = require('../stores/GlobeViewStore');
+const React = require('react');
+const ReactDOM = require('react-dom');
+const queue = require('d3-queue');
+const GlobeViewStore = require('../stores/GlobeViewStore');
 
 var m0, o0, fill, proj, sky, path, swoosh, links, svg, width, height, arcLines;
 var dataset, container;
 
 function buildGraph(root, ipsrc) {
-    container = $(this.getDOMNode());
+    container = $(ReactDOM.findDOMNode(this));
     container.html("");
     dataset = root;
 

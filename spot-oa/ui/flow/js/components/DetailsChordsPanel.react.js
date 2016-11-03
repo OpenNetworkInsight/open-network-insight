@@ -1,6 +1,7 @@
-var React = require('react');
-var d3 = require('d3');
-var ChordsDiagramStore = require('../stores/ChordsDiagramStore');
+const React = require('react');
+const ReactDOM = require('react-dom');
+const d3 = require('d3');
+const ChordsDiagramStore = require('../stores/ChordsDiagramStore');
 
 /**
  *  Draws a chords diagram to display detailed information for a threat
@@ -15,8 +16,8 @@ function draw(matrix, mmap, ip) {
   var rdr = chordRdr(matrix, mmap);
 
   // Graph dimensions
-  var width = $(this.getDOMNode()).width(),
-      height = $(this.getDOMNode()).height(),
+  var width = $(ReactDOM.findDOMNode(this)).width(),
+      height = $(ReactDOM.findDOMNode(this)).height(),
       innerRadius = Math.min(width, height) * .41, //.41 is a magic number for graph stilyng purposes
       outerRadius = innerRadius * 1.1; //1.1 is a magic number for graph stilyng purposes
 
@@ -28,10 +29,10 @@ function draw(matrix, mmap, ip) {
               .on('drag', drag.bind(this));
 
   //Clean the container div to re-draw the diagram
-  d3.select(this.getDOMNode()).select('svg').remove();
+  d3.select(ReactDOM.findDOMNode(this)).select('svg').remove();
 
   // Main SVG
-  var svg = d3.select(this.getDOMNode()).append("svg")
+  var svg = d3.select(ReactDOM.findDOMNode(this)).append("svg")
             .attr("width", width)
             .attr("height", height)
           .append("g")
@@ -39,7 +40,7 @@ function draw(matrix, mmap, ip) {
             .call(dragB);
 
   // Tooltip generator
-  var tooltip = d3.select(this.getDOMNode())
+  var tooltip = d3.select(ReactDOM.findDOMNode(this))
                     .append("div")
                     .classed('node-label', true);
 
@@ -165,8 +166,8 @@ function groupTip(d) {
 }
 
 function drag() {
-  var width = $(this.getDOMNode()).width(),
-      height = $(this.getDOMNode()).height(),
+  var width = $(ReactDOM.findDOMNode(this)).width(),
+      height = $(ReactDOM.findDOMNode(this)).height(),
       x1 = width / 2,
       y1 = height / 2,
       x2 = d3.event.x,
@@ -174,7 +175,7 @@ function drag() {
 
   var newAngle = Math.atan2(y2 - y1, x2 - x1) / (Math.PI / 180);
 
-  d3.select(this.getDOMNode()).select("svg > g").attr("transform", "translate(" + width / 2 + "," + height / 2 + ") rotate(" + newAngle + ",0,0)");
+  d3.select(ReactDOM.findDOMNode(this)).select("svg > g").attr("transform", "translate(" + width / 2 + "," + height / 2 + ") rotate(" + newAngle + ",0,0)");
 }
 
 var DetailsChordsPanel = React.createClass({

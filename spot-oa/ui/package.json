@@ -17,8 +17,8 @@
     "jquery": "^2.0.0",
     "js-base64": "^2.1.9",
     "object-assign": "^1.0.0",
-    "react": "^0.14.8",
-    "react-dom": "^0.14.8",
+    "react": "^15.3.2",
+    "react-dom": "^15.3.2",
     "underscore": "^1.8.3"
   },
   "devDependencies": {
@@ -55,10 +55,11 @@
     "react-dom/server": "global:ReactDOMServer"
   },
   "jest": {
-    "automock": false,
     "verbose": false,
     "collectCoverage": false,
-    "collectCoverageFrom": ["**/*.{js,jsx}"],
+    "collectCoverageFrom": [
+      "**/*.{js,jsx}"
+    ],
     "coveragePathIgnorePatterns": [
       "<rootDir>/flow/js/",
       "<rootDir>/dns/js/",

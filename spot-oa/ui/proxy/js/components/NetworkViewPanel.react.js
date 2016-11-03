@@ -1,7 +1,8 @@
-var $ = require('jquery');
-var assign = require('object-assign');
-var d3 = require('d3');
-var React = require('react');
+const $ = require('jquery');
+const assign = require('object-assign');
+const d3 = require('d3');
+const React = require('react');
+const ReactDOM = require('react-dom');
 
 var EdInActions = require('../../../js/actions/EdInActions');
 var SpotConstants = require('../../../js/constants/SpotConstants');
@@ -68,7 +69,7 @@ var NetworkViewPanel = React.createClass({
     buildGraph: function () {
         var node, width, height, zoom, svg;
 
-        node = this.getDOMNode();
+        node = ReactDOM.findDOMNode(this);
 
         width = $(node).width();
         height = $(node).height();

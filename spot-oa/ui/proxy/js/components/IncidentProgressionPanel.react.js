@@ -1,7 +1,8 @@
-var $ = require('jquery');
-var d3 = require('d3');
+const $ = require('jquery');
+const d3 = require('d3');
 require('d3-tip')(d3);
-var React = require('react');
+const React = require('react');
+const ReactDOM = require('react-dom');
 
 var CategoryLayout = require('../../../js/utils/CategoryLayout');
 var ContentLoaderMixin = require('../../../js/components/ContentLoaderMixin.react');
@@ -29,13 +30,14 @@ var IncidentProgressionPanel = React.createClass({
     buildChart: function () {
         let element, width, height;
 
-        element = $(this.getDOMNode());
+        element = $(ReactDOM.findDOMNode(this));
 
         width = element.width();
         height = element.height();
 
         this.d3Dispatch = d3.dispatch('scroll');
         this.d3Dispatch.on('scroll', this.onScroll);
+
         this.svgSel = d3.select(this.svg);
 
         this.canvas = this.svgSel.select('g');
@@ -87,7 +89,7 @@ var IncidentProgressionPanel = React.createClass({
         this.canvas.call(this.tip);
     },
     _createLayout() {
-        let element = $(this.getDOMNode());
+        let element = $(ReactDOM.findDOMNode(this));
         let categories = ['referer', 'clientip', 'reqmethod', 'resconttype', 'fulluri', 'refered'];
 
         return new CategoryLayout()
@@ -107,7 +109,7 @@ var IncidentProgressionPanel = React.createClass({
         let element, layout, nodes, links;
 
         // Make sure svg element takes all available space
-        element = $(this.getDOMNode());
+        element = $(ReactDOM.findDOMNode(this));
         this.svgSel.style('width', element.width()).style('height', element.height());
 
         layout = this._createLayout();
@@ -154,7 +156,7 @@ var IncidentProgressionPanel = React.createClass({
         if (n.type=='clientip') {
             let delta = !d3.event || !d3.event.deltaY ? -100 : removing ? -d3.event.deltaY : d3.event.deltaY;
 
-            return [n.x, (delta<0 ? -LEGEND_HEIGHT-NODE_RADIOUS : $(this.getDOMNode()).height()+NODE_RADIOUS)];
+            return [n.x, (delta<0 ? -LEGEND_HEIGHT-NODE_RADIOUS : $(ReactDOM.findDOMNode(this)).height()+NODE_RADIOUS)];
         }
         else {
             return this.getRootLocation();
@@ -303,7 +305,7 @@ var IncidentProgressionPanel = React.createClass({
         let categoryWidth = size[0] / categories.length;
 
         let xOffset = (categoryWidth / 2) - 20;
-        let yOffset = $(this.getDOMNode()).height() - (LEGEND_HEIGHT*1.5);
+        let yOffset = $(ReactDOM.findDOMNode(this)).height() - (LEGEND_HEIGHT*1.5);
 
         let nodes = categories.map((category, idx) => {
             return {
