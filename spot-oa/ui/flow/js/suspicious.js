@@ -1,4 +1,5 @@
 var React = require('react');
+var ReactDOM = require('react-dom');
 
 var SpotConstants = require('../../js/constants/SpotConstants');
 var SpotActions = require('../../js/actions/SpotActions');
@@ -15,7 +16,7 @@ function resetFilterAndReload()
   EdInActions.reloadSuspicious();
 };
 
-React.render(
+ReactDOM.render(
   (
     <form className="form-inline">
       <div className="form-group">
@@ -56,7 +57,7 @@ var DetailsPanel = require('./components/DetailsPanel.react');
 
 var ipynbClosure = IPythonNotebookPanel.createIPythonNotebookClosure(SpotConstants.NOTEBOOK_PANEL);
 
-React.render(
+ReactDOM.render(
   <div id="spot-content">
     <PanelRow>
       <Panel title={SpotConstants.SUSPICIOUS_PANEL} expandable reloadable onReload={EdInActions.reloadSuspicious}>

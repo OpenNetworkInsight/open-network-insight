@@ -17,7 +17,8 @@
     "jquery": "^2.0.0",
     "js-base64": "^2.1.9",
     "object-assign": "^1.0.0",
-    "react": "^0.13.3",
+    "react": "^0.14.8",
+    "react-dom": "^0.14.8",
     "underscore": "^1.8.3"
   },
   "devDependencies": {
@@ -42,29 +43,30 @@
   },
   "browserify": {
     "transform": [
-      [
-        "babelify",
-        {
-          "presets": [
-            "es2015",
-            "react"
-          ]
-        }
-      ],
+      "babelify",
       "browserify-shim"
     ]
   },
   "browserify-shim": {
     "jquery": "global:$",
-    "d3": "global:d3"
+    "d3": "global:d3",
+    "react": "global:React",
+    "react-dom": "global:ReactDOM",
+    "react-dom/server": "global:ReactDOMServer"
   },
   "jest": {
+    "automock": false,
     "verbose": false,
     "collectCoverage": false,
     "collectCoverageFrom": ["**/*.{js,jsx}"],
     "coveragePathIgnorePatterns": [
-      "<rootDir>/flow/js/", "<rootDir>/dns/js/", "<rootDir>/proxy/js/", "<rootDir>/ipython/custom/",
-      "/node_modules/", "/coverage/"
+      "<rootDir>/flow/js/",
+      "<rootDir>/dns/js/",
+      "<rootDir>/proxy/js/",
+      "<rootDir>/ipython/custom/",
+      "/node_modules/",
+      "/coverage/",
+      ".*.bundle.min.js$"
     ]
   }
 }

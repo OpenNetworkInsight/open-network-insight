@@ -2,6 +2,7 @@ var $ = require('jquery');
 const Base64 = require('js-base64').Base64;
 var d3 = require('d3');
 var React = require('react');
+var ReactDOM = require('react-dom');
 const SpotUtils = require('../utils/SpotUtils');
 
 var DendrogramMixin = {
@@ -9,7 +10,7 @@ var DendrogramMixin = {
   {
     const svgSel = $(this.svg);
 
-    this.canvasWidth = $(this.getDOMNode()).width();
+    this.canvasWidth = $(ReactDOM.findDOMNode(this)).width();
     this.canvasHeight = 100 + this.state.leafNodes * 20; // Make sure last magic number is at least twice the font size
 
     svgSel.width(this.canvasWidth).height(this.canvasHeight);
