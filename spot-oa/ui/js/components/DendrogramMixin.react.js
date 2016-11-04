@@ -8,12 +8,7 @@ const SpotUtils = require('../utils/SpotUtils');
 var DendrogramMixin = {
   buildChart ()
   {
-    const svgSel = $(this.svg);
-
-    this.canvasWidth = $(ReactDOM.findDOMNode(this)).width();
-    this.canvasHeight = 100 + this.state.leafNodes * 20; // Make sure last magic number is at least twice the font size
-
-    svgSel.width(this.canvasWidth).height(this.canvasHeight);
+    $(this.svg).width('100%');
 
     this.cluster = d3.layout.cluster();
 
@@ -26,7 +21,14 @@ var DendrogramMixin = {
                                         .attr('transform', 'translate(100,50)');
   },
   draw() {
-      this.cluster.size([this.canvasHeight-100, this.canvasWidth-300]);
+      const svgElement = $(this.svg);
+
+      let canvasWidth = svgElement.width();
+      let canvasHeight = 100 + this.state.leafNodes * 20; // Make sure last magic number is at least twice the font size
+
+      svgElement.height(canvasHeight);
+
+      this.cluster.size([canvasHeight-100, canvasWidth-300]);
 
       const nodes = this.cluster.nodes(this.state.data);
       const links = this.cluster.links(nodes);

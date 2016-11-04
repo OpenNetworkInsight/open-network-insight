@@ -67,7 +67,7 @@ ReactDOM.render(
             </Panel>
             <Panel title={SpotConstants.NETVIEW_PANEL} container expandable reloadable
                    onReload={EdInActions.reloadSuspicious}>
-                <NetworkViewPanel />
+                <NetworkViewPanel className="proxy-force" />
             </Panel>
         </PanelRow>
         <PanelRow>

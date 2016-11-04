@@ -63,14 +63,15 @@ const TimelineMixin = {
         }
     },
     draw() {
+        const rootNode = $(ReactDOM.findDOMNode(this));
         // Get current viewport width
-        this.eventDropsChart.width($(ReactDOM.findDOMNode(this)).width());
+        this.eventDropsChart.width(rootNode.width());
 
         // Create svg element and draw eventDropsChart
         this.canvas.call(this.eventDropsChart);
         // TODO: Find a better way to re-render childrens when panel toggles
         // Make sure we don't listen twice for the same event
-        $('svg', this.canvas.node()).off('parentUpdate').on('parentUpdate', this._onViewportResize);
+        $('svg', rootNode).off('parentUpdate').on('parentUpdate', this.draw);
 
         // Add a tooltip
         if (this.getTooltipContent) {

@@ -27,7 +27,7 @@ const TimelineChart = React.createClass({
             this.setState(state);
         }
     },
-    _getStateFromStoreData: function (data)
+    _getStateFromStoreData(data)
     {
         const state = {
             loading: false,

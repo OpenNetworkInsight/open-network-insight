@@ -32,9 +32,9 @@ var ChartMixin = {
             state.data && this.draw();
         }
 
-        window.addEventListener('resize', this._onViewportResize);
+        window.addEventListener('resize', this.draw);
         if (this.svg) {
-            $(this.svg).on('parentUpdate', this._onViewportResize);
+            $(this.svg).on('parentUpdate', this.draw);
         }
     },
     renderContent() {
@@ -55,10 +55,6 @@ var ChartMixin = {
                 {chartContent}
             </div>
         );
-    },
-    _onViewportResize: function () {
-        this.buildChart();
-        this.draw();
     }
 };
 
