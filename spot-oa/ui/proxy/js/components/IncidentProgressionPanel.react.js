@@ -4,28 +4,22 @@ require('d3-tip')(d3);
 const React = require('react');
 const ReactDOM = require('react-dom');
 
-var CategoryLayout = require('../../../js/utils/CategoryLayout');
-var ContentLoaderMixin = require('../../../js/components/ContentLoaderMixin.react');
-var ChartMixin = require('../../../js/components/ChartMixin.react');
-var IncidentProgressionStore = require('../stores/IncidentProgressionStore');
+const CategoryLayout = require('../../../js/utils/CategoryLayout');
+const ContentLoaderMixin = require('../../../js/components/ContentLoaderMixin.react');
+const ChartMixin = require('../../../js/components/ChartMixin.react');
+const IncidentProgressionStore = require('../stores/IncidentProgressionStore');
 
-var LEGEND_HEIGHT = 50;
-var TRANSITION_DURATION  = 3000;
-var NODE_RADIOUS = 10;
+const LEGEND_HEIGHT = 50;
+const TRANSITION_DURATION  = 3000;
+const NODE_RADIOUS = 10;
 
-var IncidentProgressionPanel = React.createClass({
+const IncidentProgressionPanel = React.createClass({
     mixins: [ContentLoaderMixin, ChartMixin],
     componentDidMount: function () {
         IncidentProgressionStore.addChangeDataListener(this._onChange);
-        window.addEventListener('resize', this._onWindowResize);
     },
     componentWillUnmount: function () {
         IncidentProgressionStore.removeChangeDataListener(this._onChange);
-        window.removeEventListener('resize', this._onWindowResize);
-    },
-    _onWindowResize: function () {
-        this.buildChart();
-        this.draw();
     },
     buildChart: function () {
         let element, width, height;

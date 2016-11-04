@@ -9,6 +9,12 @@ var ChartMixin = {
             className: 'spot-chart'
         };
     },
+    componentWillUpdate() {
+        if (this.svg) {
+            $(this.svg).off('parentUpdate');
+            window.removeEventListener('resize', this._onViewportResize);
+        }
+    },
     componentDidUpdate: function (prevProps, prevState)
     {
         var state;
@@ -25,8 +31,13 @@ var ChartMixin = {
 
             state.data && this.draw();
         }
+
+        if (this.svg) {
+            $(this.svg).on('parentUpdate', this._onViewportResize);
+            window.addEventListener('resize', this._onViewportResize);
+        }
     },
-    renderContent: function () {
+    renderContent() {
         const state = this.state || {};
         var chartContent;
 
@@ -35,7 +46,7 @@ var ChartMixin = {
                 chartContent = this.props.children;
             }
             else {
-                chartContent = <svg ref={e => {this.svg=e?e.getDOMNode():e;}} />;
+                chartContent = <svg ref={e => this.svg=e} />;
             }
         }
 
@@ -45,6 +56,10 @@ var ChartMixin = {
             </div>
         );
     },
+    _onViewportResize: function () {
+        this.buildChart();
+        this.draw();
+    }
 };
 
 module.exports = ChartMixin;

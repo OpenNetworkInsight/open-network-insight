@@ -41,7 +41,7 @@ ReactDOM.render(
             <ExecutiveThreatBriefingPanel store={CommentsStore} />
         </Panel>
         <Panel className="col-md-8 spot-stage" title={SpotConstants.INCIDENT_PANEL} container expandable>
-            <IncidentProgressionPanel className="spot-incident-progression"/>
+            <IncidentProgressionPanel className="spot-incident-progression" />
         </Panel>
         <Panel className="col-md-4 spot-sidebar timeline" title={SpotConstants.TIMELINE_PANEL} expandable>
             <TimelinePanel />
