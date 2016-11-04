@@ -143,7 +143,7 @@ var Panel = React.createClass({
     componentDidUpdate(prevProps, prevState) {
         // Is this the panel being minimized?
         if (this.state.maximized!==prevState.maximized) {
-            // TODO: A better way to re-render childrens when panel toggles
+            // TODO: Find a better way to re-render childrens when panel toggles
             $('svg', ReactDOM.findDOMNode(this)).trigger('parentUpdate');
         }
     }

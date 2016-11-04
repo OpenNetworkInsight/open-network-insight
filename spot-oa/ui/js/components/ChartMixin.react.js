@@ -10,9 +10,9 @@ var ChartMixin = {
         };
     },
     componentWillUpdate() {
+        window.removeEventListener('resize', this._onViewportResize);
         if (this.svg) {
             $(this.svg).off('parentUpdate');
-            window.removeEventListener('resize', this._onViewportResize);
         }
     },
     componentDidUpdate: function (prevProps, prevState)
@@ -32,9 +32,9 @@ var ChartMixin = {
             state.data && this.draw();
         }
 
+        window.addEventListener('resize', this._onViewportResize);
         if (this.svg) {
             $(this.svg).on('parentUpdate', this._onViewportResize);
-            window.addEventListener('resize', this._onViewportResize);
         }
     },
     renderContent() {
