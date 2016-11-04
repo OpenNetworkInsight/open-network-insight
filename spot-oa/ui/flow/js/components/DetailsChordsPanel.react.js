@@ -39,6 +39,8 @@ function draw(matrix, mmap, ip) {
             .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")")
             .call(dragB);
 
+  $('svg', ReactDOM.findDOMNode(this)).off('parentUpdate').on('parentUpdate', this.buildGraph);
+
   // Tooltip generator
   var tooltip = d3.select(ReactDOM.findDOMNode(this))
                     .append("div")

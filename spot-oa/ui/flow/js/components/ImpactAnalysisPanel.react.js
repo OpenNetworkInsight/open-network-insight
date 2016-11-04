@@ -29,6 +29,8 @@ function buildGraph(root, ipsrc)
         .append("svg:g")
         .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
 
+    $('svg', ReactDOM.findDOMNode(this)).off('parentUpdate').on('parentUpdate', () => buildGraph.call(this, root, ipsrc));
+
     svg.append("svg:rect")
         .attr("class", "background")
         .attr("width", w)

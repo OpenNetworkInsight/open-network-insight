@@ -53,6 +53,8 @@ function buildGraph(root, ipsrc) {
         .attr("height", height)
         .on("mousedown", mousedown);
 
+    $('svg', ReactDOM.findDOMNode(this)).off('parentUpdate').on('parentUpdate', () => buildGraph.call(this, root, ipsrc));
+
     queue()
         .defer(d3.json, "../flow/world-110m.json")
         .defer(getRawData)
