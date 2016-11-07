@@ -8,6 +8,8 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spot.SpotLDACWrapper
 import org.apache.spot.SpotLDACWrapper.{SpotLDACInput, SpotLDACOutput}
+import org.apache.spot.SpotSparkLDAWrapper
+import org.apache.spot.SpotSparkLDAWrapper.{SpotSparkLDAInput, SpotSparkLDAOutput}
 import org.apache.spot.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.apache.spot.dns.DNSSchema._
 import org.apache.spot.dns.DNSWordCreation
@@ -46,7 +48,8 @@ class DNSSuspiciousConnectsModel(inTopicCount: Int,
                                  inFrameLengthCuts: Array[Double],
                                  inSubdomainLengthCuts: Array[Double],
                                  inNumberPeriodsCuts: Array[Double],
-                                 inEntropyCuts: Array[Double]) {
+                                 inEntropyCuts: Array[Double],
+                                 inLdaDistributor: String ) {
 
   val topicCount = inTopicCount
   val ipToTopicMix = inIpToTopicMix
@@ -56,7 +59,7 @@ class DNSSuspiciousConnectsModel(inTopicCount: Int,
   val subdomainLengthCuts = inSubdomainLengthCuts
   val numberPeriodsCuts = inNumberPeriodsCuts
   val entropyCuts = inEntropyCuts
-
+  val ldaDistributor = inLdaDistributor
   /**
     * Use a suspicious connects model to assign estimated probabilities to a dataframe of
     * DNS log events.
@@ -145,7 +148,8 @@ object DNSSuspiciousConnectsModel {
                     logger: Logger,
                     config: SuspiciousConnectsConfig,
                     inDF: DataFrame,
-                    topicCount: Int): DNSSuspiciousConnectsModel = {
+                    topicCount: Int,
+                    ldaDistributor: String = "mpi" ): DNSSuspiciousConnectsModel = {
 
     logger.info("Training DNS suspicious connects model from " + config.inputPath)
 
@@ -186,37 +190,68 @@ object DNSSuspiciousConnectsModel {
     val dataWithWordDF = totalDataDF.withColumn(Word, dnsWordCreator.wordCreationUDF(modelColumns: _*))
 
     // aggregate per-word counts at each IP
+    if(config.ldaImplementation == "LDAC") {
+      val ipDstWordCounts =
+        dataWithWordDF.select(ClientIP, Word).map({ case Row(destIP: String, word: String) => (destIP, word) -> 1 })
+          .reduceByKey(_ + _)
+          .map({ case ((ipDst, word), count) => SpotLDACInput(ipDst, word, count) })
 
-    val ipDstWordCounts =
-      dataWithWordDF.select(ClientIP, Word).map({ case Row(destIP: String, word: String) => (destIP, word) -> 1 })
-        .reduceByKey(_ + _)
-        .map({ case ((ipDst, word), count) => SpotLDACInput(ipDst, word, count) })
+      val SpotLDACOutput(ipToTopicMix, wordToPerTopicProb) = SpotLDACWrapper.runLDA(ipDstWordCounts,
+        config.modelFile,
+        config.topicDocumentFile,
+        config.topicWordFile,
+        config.mpiPreparationCmd,
+        config.mpiCmd,
+        config.mpiProcessCount,
+        config.topicCount,
+        config.localPath,
+        config.ldaPath,
+        config.localUser,
+        config.analysis,
+        config.nodes,
+        config.ldaPRGSeed)
 
+      new DNSSuspiciousConnectsModel(topicCount,
+        ipToTopicMix,
+        wordToPerTopicProb,
+        timeCuts,
+        frameLengthCuts,
+        subdomainLengthCuts,
+        numberPeriodsCuts,
+        entropyCuts,
+        ldaDistributor )
 
-    val SpotLDACOutput(ipToTopicMix, wordToPerTopicProb) = SpotLDACWrapper.runLDA(ipDstWordCounts,
-      config.modelFile,
-      config.topicDocumentFile,
-      config.topicWordFile,
-      config.mpiPreparationCmd,
-      config.mpiCmd,
-      config.mpiProcessCount,
-      config.topicCount,
-      config.localPath,
-      config.ldaPath,
-      config.localUser,
-      config.analysis,
-      config.nodes,
-      config.ldaPRGSeed)
+    } else {
+      val ipDstWordCountsSpark =
+        dataWithWordDF.select(ClientIP, Word).map({ case Row(destIP: String, word: String) => (destIP, word) -> 1 })
+          .reduceByKey(_ + _)
+          .map({ case ((ipDst, word), count) => SpotSparkLDAInput(ipDst, word, count) })
 
+      val SpotSparkLDAOutput(ipToTopicMix, wordToPerTopicProb) = SpotSparkLDAWrapper.runLDA(ipDstWordCountsSpark,
+        config.modelFile,
+        config.topicDocumentFile,
+        config.topicWordFile,
+        config.topicCount,
+        config.localPath,
+        config.ldaPath,
+        config.localUser,
+        config.analysis,
+        config.ldaPRGSeed,
+        "em",
+        2.5,
+        1.1,
+        120)
 
-    new DNSSuspiciousConnectsModel(topicCount,
-      ipToTopicMix,
-      wordToPerTopicProb,
-      timeCuts,
-      frameLengthCuts,
-      subdomainLengthCuts,
-      numberPeriodsCuts,
-      entropyCuts)
+      new DNSSuspiciousConnectsModel(topicCount,
+        ipToTopicMix,
+        wordToPerTopicProb,
+        timeCuts,
+        frameLengthCuts,
+        subdomainLengthCuts,
+        numberPeriodsCuts,
+        entropyCuts,
+        ldaDistributor )
+    }
   }
 
   /**

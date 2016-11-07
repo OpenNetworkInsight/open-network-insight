@@ -112,7 +112,7 @@ object SpotLDACWrapper {
     val docToTopicMix = getDocumentResults(documentTopicMixRawLines, documentDictionary, topicCount)
 
     // Create word results
-    val wordResults = getWordToProbPerTopicMap(topicWordData, wordDictionary)
+    val wordResults: Map[String, Array[Double]] = getWordToProbPerTopicMap(topicWordData, wordDictionary)
 
     SpotLDACOutput(docToTopicMix, wordResults)
   }
