@@ -7,13 +7,14 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SQLContext, WideUDFs}
-import org.apache.spot.SpotLDACWrapper
+import org.apache.spot.{SpotLDACWrapper, SpotSparkLDAWrapper}
 import org.apache.spot.SpotLDACWrapper.{SpotLDACInput, SpotLDACOutput}
 import org.apache.spot.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.apache.spot.netflow.FlowSchema._
 import org.apache.spot.netflow.FlowWordCreator
 import org.apache.spot.utilities.Quantiles
 import WideUDFs.udf
+import org.apache.spot.SpotSparkLDAWrapper.{SpotSparkLDAInput, SpotSparkLDAOutput}
 
 /**
   * A probabilistic model of the netflow traffic observed in a network.
@@ -206,34 +207,63 @@ object FlowSuspiciousConnectsModel {
       .map({ case Row(destinationIp: String, destinationWord: String) => (destinationIp, destinationWord) -> 1 })
       .reduceByKey(_ + _)
 
-    val ipWordCounts =
-      sparkContext.union(srcWordCounts, dstWordCounts)
-        .reduceByKey(_ + _)
-        .map({ case ((ip, word), count) => SpotLDACInput(ip, word, count) })
+    if (config.ldaImplementation == "LDAC") {
+      val ipWordCounts =
+        sparkContext.union(srcWordCounts, dstWordCounts)
+          .reduceByKey(_ + _)
+          .map({ case ((ip, word), count) => SpotLDACInput(ip, word, count) })
 
 
-    val SpotLDACOutput(ipToTopicMix, wordToPerTopicProb) = SpotLDACWrapper.runLDA(ipWordCounts,
-      config.modelFile,
-      config.topicDocumentFile,
-      config.topicWordFile,
-      config.mpiPreparationCmd,
-      config.mpiCmd,
-      config.mpiProcessCount,
-      config.topicCount,
-      config.localPath,
-      config.ldaPath,
-      config.localUser,
-      config.analysis,
-      config.nodes,
-      config.ldaPRGSeed)
+      val SpotLDACOutput(ipToTopicMix, wordToPerTopicProb) = SpotLDACWrapper.runLDA(ipWordCounts,
+        config.modelFile,
+        config.topicDocumentFile,
+        config.topicWordFile,
+        config.mpiPreparationCmd,
+        config.mpiCmd,
+        config.mpiProcessCount,
+        config.topicCount,
+        config.localPath,
+        config.ldaPath,
+        config.localUser,
+        config.analysis,
+        config.nodes,
+        config.ldaPRGSeed)
 
+      new FlowSuspiciousConnectsModel(topicCount,
+        ipToTopicMix,
+        wordToPerTopicProb,
+        timeCuts,
+        ibytCuts,
+        ipktCuts)
 
-    new FlowSuspiciousConnectsModel(topicCount,
-      ipToTopicMix,
-      wordToPerTopicProb,
-      timeCuts,
-      ibytCuts,
-      ipktCuts)
+    } else {
+      val ipWordCounts =
+        sparkContext.union(srcWordCounts, dstWordCounts)
+          .reduceByKey(_ + _)
+          .map({ case ((ip, word), count) => SpotSparkLDAInput(ip, word, count) })
+      val SpotSparkLDAOutput(ipToTopicMix, wordToPerTopicProb) = SpotSparkLDAWrapper.runLDA(ipWordCounts,
+        config.modelFile,
+        config.topicDocumentFile,
+        config.topicWordFile,
+        config.topicCount,
+        config.localPath,
+        config.ldaPath,
+        config.localUser,
+        config.analysis,
+        config.ldaPRGSeed,
+        "em",
+        2.5,
+        1.1,
+        120)
+
+      new FlowSuspiciousConnectsModel(topicCount,
+        ipToTopicMix,
+        wordToPerTopicProb,
+        timeCuts,
+        ibytCuts,
+        ipktCuts)
+    }
+
   }
 
 }
