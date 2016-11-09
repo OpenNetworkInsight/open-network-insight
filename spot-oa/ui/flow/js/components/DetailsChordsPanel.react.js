@@ -3,258 +3,283 @@ const ReactDOM = require('react-dom');
 const d3 = require('d3');
 const ChordsDiagramStore = require('../stores/ChordsDiagramStore');
 
-/**
- *  Draws a chords diagram to display detailed information for a threat
- **/
-function draw(matrix, mmap, ip) {
-  // generate chord layout
-  var chord = d3.layout.chord()
+function buildTooltip (d, i, chords) {
+    const p = d3.format(".4%");
+
+    var tooltip;
+
+    tooltip = `<h5><strong>${d.gname}</strong></h5>`;
+    tooltip+= `<p>${numberFormat(d.gvalue)} Avg Bytes. `;
+    tooltip+= `${p(d.gvalue / d.mtotal)} of Matrix Total (${numberFormat(d.mtotal)})</p>`;
+
+    var toInfo = '', fromInfo = '';
+
+    chords.forEach((d) => {
+        if (d.source.index == i) {
+            if (!d.target.value) return;
+
+            const data = this.state.data.rdr(d);
+
+            toInfo += `<li>${numberFormat(data.tvalue)} avg bytes to ${data.tname}</li>`;
+        }
+        else if (d.target.index == i) {
+            if (!d.source.value) return;
+
+            const data = this.state.data.rdr(d);
+
+            fromInfo += `<li>${numberFormat(data.svalue)} avg bytes from ${data.sname}</li>`;
+        }
+    });
+
+    fromInfo.length && (tooltip+= `<h5><strong>In</strong></h5><ul>${fromInfo}</ul>`);
+    toInfo.length && (tooltip+= `<h5><strong>Out</strong></h5><ul>${toInfo}</ul>`);
+
+    return tooltip;
+}
+
+const ContentLoaderMixin = require('../../../js/components/ContentLoaderMixin.react');
+const ChartMixin = require('../../../js/components/ChartMixin.react');
+
+const colorScale = d3.scale.category20();
+const numberFormat = d3.format(".3s");
+
+const DetailsChordsPanel = React.createClass({
+    mixins: [ContentLoaderMixin, ChartMixin],
+    componentDidMount()
+    {
+        ChordsDiagramStore.addChangeDataListener(this._onChange);
+    },
+    componentWillUnmount()
+    {
+        ChordsDiagramStore.removeChangeDataListener(this._onChange);
+    },
+    buildChart() {
+        // generate chord layout
+        this.chord = d3.layout.chord()
             .padding(.05)
             .sortSubgroups(d3.descending)
-            .matrix(matrix);
+            .matrix(this.state.data.matrix);
 
-  var rdr = chordRdr(matrix, mmap);
+        const dragB = d3.behavior.drag()
+                        .on('drag', this.drag);
 
-  // Graph dimensions
-  var width = $(ReactDOM.findDOMNode(this)).width(),
-      height = $(ReactDOM.findDOMNode(this)).height(),
-      innerRadius = Math.min(width, height) * .41, //.41 is a magic number for graph stilyng purposes
-      outerRadius = innerRadius * 1.1; //1.1 is a magic number for graph stilyng purposes
+        // Main SVG
+        this.svgSel = d3.select(this.svg)
+                        .attr('width', '100%')
+                        .attr('height', '100%');
 
-  var fill = d3.scale.ordinal()
-                .domain(d3.range(4))
-                .range(["#F3D54E", "#00AEEF", "#C4D600", "#FC4C02", "#FFA300"]);
+        this.middle = this.svgSel.append('g');
+        this.canvas = this.svgSel.append('g')
+                            .call(dragB);
 
-  var dragB = d3.behavior.drag()
-              .on('drag', drag.bind(this));
+        this.tooltip = d3.tip()
+            .attr('class', 'd3-tip')
+            .html(({d, i}) => {
+                const chords = this.canvas.selectAll('.chord path').data();
 
-  //Clean the container div to re-draw the diagram
-  d3.select(ReactDOM.findDOMNode(this)).select('svg').remove();
+                return buildTooltip.call(this, this.state.data.rdr(d), i, chords);
+            });
 
-  // Main SVG
-  var svg = d3.select(ReactDOM.findDOMNode(this)).append("svg")
-            .attr("width", width)
-            .attr("height", height)
-          .append("g")
-            .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")")
-            .call(dragB);
+        this.svgSel.call(this.tooltip);
+    },
+    draw() {
+        const $svg = $(this.svg);
 
-  $('svg', ReactDOM.findDOMNode(this)).off('parentUpdate').on('parentUpdate', this.buildGraph);
+        // Graph dimensions
+        const width = $svg.width();
+        const height = $svg.height();
 
-  // Tooltip generator
-  var tooltip = d3.select(ReactDOM.findDOMNode(this))
-                    .append("div")
-                    .classed('node-label', true);
+        this.middle.attr('transform', `translate(${width/2},${height/2})`);
+        this.canvas.attr('transform', `translate(${width/2},${height/2})`);
 
-  // Appending the chord paths
-  var groups = svg.selectAll("g.group")
-                            .data(chord.groups())
-                            .enter().append("svg:g")
-                              .attr("class", "group")
-                              .on("mouseover", function (d, i) {
-                                var chord = svg.selectAll(".chord path").data().filter(function (d) { return (d.source.index == i || d.target.index == i);});
+        const innerRadius = Math.min(width, height) * .41; //.41 is a magic number for graph stilyng purposes
+        const outerRadius = innerRadius * 1.1; //1.1 is a magic number for graph stilyng purposes
 
-                                tooltip.style("visibility", "visible");
-                                tooltip.html(groupTip(rdr(d)) + chordTip(rdr(chord[0])));
+        // Tooltip metadata
+        this.tooltip.target = [width/2, height/2];
 
-                                svg.selectAll(".chord path")
-                                                    .filter(function (d) { return d.source.index != i && d.target.index != i; })
-                                                    .transition()
-                                                    .style("opacity", 0.1);
-                              })
-                              .on('mousemove', function (d) {
-                                if ((height*.5) > d3.event.layerY)
-                                {
-                                  tooltip.style('top', d3.event.layerY + 'px');
-                                }
-                                else
-                                {
-                                  tooltip.style('top', (d3.event.layerY-125) + 'px');
-                                }
+        this.drawGroups(this.chord.groups(), innerRadius, outerRadius);
+        this.drawChords(this.chord.chords(), innerRadius);
+    },
+    drawGroups(groups, innerRadius, outerRadius) {
+        // Appending the chord paths
+        const groupsSel = {};
 
-                                if ((width*.5) > d3.event.layerX)
-                                {
-                                  // Show tooltip to the right
-                                  tooltip.style('left', (d3.event.layerX + 20) + 'px');
-                                }
-                                else
-                                {
-                                  // Show tooltip to the left
-                                  tooltip.style('left', (d3.event.layerX - 450) + 'px');
-                                }
-                              })
-                              .on("mouseout", function () {
-                                tooltip.style("visibility", "hidden");
+        groupsSel.update = this.canvas.selectAll('g.group').data(groups);
+        groupsSel.enter = groupsSel.update.enter();
 
-                                fade(svg, 1)();
-                              });
+        const allGroups = groupsSel.enter.append('g')
+                            .classed('group', true)
+                            .on('mouseover', (d, i) => {
+                                const mouseToTheRight = d3.event.layerX>this.tooltip.target[0];
+                                const mouseTotheBottom = d3.event.layerY>this.tooltip.target[1];
 
-  groups.append("svg:path")
-           .style("stroke", "black")
-           .style("fill", function (d) { return fill(d.index); })
-           .style("cursor", "pointer")
-           .attr("d", d3.svg.arc().innerRadius(innerRadius).outerRadius(outerRadius));
+                                // Decide where should the tooltip be displayed?
+                                //var direction = mouseTotheBottom ? 'n' : 's';
+                                var direction = mouseToTheRight ? 'w' : 'e';
 
-  //grouping and appending the Chords
-  svg.append("g")
-            .attr("class", "chord")
-          .selectAll("path")
-            .data(chord.chords())
-          .enter().append("path")
-            .attr("d", d3.svg.chord().radius(innerRadius))
-            .style("fill", function (d) { return fill(d.target.index); })
-            .style("opacity", 1);
+                                this.tooltip.direction(direction);
 
-  groups.append("svg:text")
-           .each(function (d) { d.angle = (d.startAngle + d.endAngle) / 2; })
-           .attr("dy", ".35em")
-           .style("font-family", "helvetica, arial, sans-serif")
-           .style("font-size", "12px")
-           .style("cursor", "pointer")
-           .style("font-weight", function (d) {
-               var _d = rdr(d);
-               if (_d.gname == ip) {
-                   return "900";
-               }
-               return "normal";
-           })
-           .attr("text-anchor", function (d) { return d.angle > Math.PI ? "end" : null; })
-           .attr("transform", function (d) {
-               return "rotate(" + (d.angle * 180 / Math.PI - 90) + ")"
-                   + "translate(" + (innerRadius * 1.15) + ")"
-                   + (d.angle > Math.PI ? "rotate(180)" : "");
-           })
-           .text(function (d) {
-               var _d = rdr(d);
-               if (_d.gvalue / _d.mtotal > 0.005 || _d.gname == ip || matrix.length <= 10) {
-                   return _d.gname;
-               }
-           });
-}
+                                this.tooltip.show({d, i}, this.middle.node());
 
-// Returns an event handler for fading a given chord group.
-function fade(svg, opacity, fnMouseover) {
-  return function (d, i) {
-    svg.selectAll(".chord path")
-                            .filter(function (d) { return d.source.index != i && d.target.index != i; })
-                            .transition()
-                            .style("opacity", opacity);
+                                this.fade(0.1, i);
+                            })
+                            .on('mouseout', (d, i) => {
+                                this.tooltip.hide();
 
-    if (fnMouseover) {
-      fnMouseover();
-    }
-  };
-}
+                                this.fade(1, i);
+                            });
 
-var numberFormat = d3.format(".3s");
+        allGroups.append('path')
+                   .style('stroke', 'black')
+                   .style('fill', d => colorScale(d.index))
+                   .style('cursor', 'pointer')
+                   .attr('d', d3.svg.arc().innerRadius(innerRadius).outerRadius(outerRadius));
 
-function chordTip(d) {
-  var p = d3.format(".4%"), q = d3.format(",.3r");
+        const visibleGroups = allGroups.filter((d) => {
+            const _d = this.state.data.rdr(d);
 
-  return "<br/>Chord Info:<br/>"
-                      + numberFormat(d.svalue) + " avg bytes from IP: "
-                      + d.sname + " to IP: " + d.tname
-                      + (d.sname === d.tname ? "" : ("<br/>while...<br/>"
-                      + numberFormat(d.tvalue) + " avg bytes From IP: "
-                      + d.tname + " to IP: " + d.sname));
-}
+            // 1. Display every ip when they are 10 or less
+            // 2. Always display current threat
+            // 3. Filter ips with less than 0.5%
+            return (
+                this.state.data.matrix.length <= 10
+                || _d.gname == this.state.data.ip
+                || _d.gvalue / _d.mtotal > 0.005
+            );
+        });
 
-function groupTip(d) {
-  var p = d3.format(".4%"), q = d3.format(",.3r");
-
-  return "Group Info:<br/>"
-                        + d.gname + " : " + numberFormat(d.gvalue) + " Avg Bytes <br/>"
-                        + p(d.gvalue / d.mtotal) + " of Matrix Total (" + numberFormat(d.mtotal) + ")";
-}
-
-function drag() {
-  var width = $(ReactDOM.findDOMNode(this)).width(),
-      height = $(ReactDOM.findDOMNode(this)).height(),
-      x1 = width / 2,
-      y1 = height / 2,
-      x2 = d3.event.x,
-      y2 = d3.event.y;
-
-  var newAngle = Math.atan2(y2 - y1, x2 - x1) / (Math.PI / 180);
-
-  d3.select(ReactDOM.findDOMNode(this)).select("svg > g").attr("transform", "translate(" + width / 2 + "," + height / 2 + ") rotate(" + newAngle + ",0,0)");
-}
-
-var DetailsChordsPanel = React.createClass({
-  getInitialState: function ()
-  {
-    return {loading: true};
-  },
-  render:function()
-  {
-    var content;
-
-    if (this.state.error)
-    {
-      content = (
-        <div className="text-center text-danger">
-          {this.state.error}
-        </div>
-      );
-    }
-    else if (this.state.loading)
-    {
-      content = (
-        <div className="spot-loader">
-            Loading <span className="spinner"></span>
-        </div>
-      );
-    }
-    else
-    {
-      content = '';
-    }
-
-    return (
-      <div>{content}</div>
-    )
-  },
-  componentDidMount: function()
-  {
-    ChordsDiagramStore.addChangeDataListener(this._onChange);
-    window.addEventListener('resize', this.buildGraph);
-  },
-  componentWillUnmount: function ()
-  {
-    ChordsDiagramStore.removeChangeDataListener(this._onChange);
-    window.removeEventListener('resize', this.buildGraph);
-  },
-  componentDidUpdate: function ()
-  {
-    if (!this.state.loading && !this.state.error)
-    {
-      this.buildGraph();
-    }
-  },
-  buildGraph: function ()
-  {
-    var mpr, storeData;
-
-    storeData = ChordsDiagramStore.getData()
-    mpr = chordMpr(storeData.data);
-
-    mpr.addValuesToMap('srcip')
-                  .addValuesToMap('dstip')
-                  .setFilter(function (row, a, b) {
-                      return (row.srcip === a.name && row.dstip === b.name)
-                  })
-                  .setAccessor(function (recs, a, b) {
-                      if (recs.length==0 || !recs[0]) {
-                          return 0;
+        visibleGroups.append('text')
+                  .each((d) => { d.angle = (d.startAngle + d.endAngle) / 2; })
+                  .attr('dy', '.35em')
+                  .style('font-family', 'helvetica, arial, sans-serif')
+                  .style('font-size', '12px')
+                  .style('cursor', 'pointer')
+                  .style('font-weight', (d) => {
+                      const _d = this.state.data.rdr(d);
+                      if (_d.gname == this.state.data.ip) {
+                          return '900';
                       }
-                      return +recs[0].maxbyte;
+                      return 'normal';
+                  })
+                  .attr('text-anchor', (d) => d.angle > Math.PI ? 'end' : null)
+                  .attr('transform', (d) => {
+                      return 'rotate(' + (d.angle * 180 / Math.PI - 90) + ')'
+                          + 'translate(' + (innerRadius * 1.20) + ')'
+                          + (d.angle > Math.PI ? 'rotate(180)' : '');
+                  })
+                  .text((d) => {
+                      return this.state.data.rdr(d).gname;
                   });
 
-    draw.call(this, mpr.getMatrix(), mpr.getMap(), ChordsDiagramStore.getIp());
-  },
-  _onChange: function () {
-    this.setState(ChordsDiagramStore.getData());
-  }
+        visibleGroups.call((selection) => {
+            const matrix = this.state.data.matrix;
+            selection.each(function (d) {
+                const g = d3.select(this).append('g').attr('transform', (d) => {
+                    return 'rotate(' + (d.angle * 180 / Math.PI - 90) + ')'
+                        + 'translate(' + (innerRadius * 1.15) + ')'
+                        + (d.angle > Math.PI ? 'rotate(180)' : '');
+                });
+
+                const output = d.value>0;
+                const input = matrix.some(row => {
+                    return row[d.index]>0;
+                });
+
+                if (output) {
+                    // Group has sent some data
+                    g.append('path')
+                                .attr('d', d3.svg.symbol().type('triangle-up'))
+                                .attr('fill', '#00ff00')
+                                .attr('transform', `translate(0,${input?-6:3})`);
+                }
+
+                if (input) {
+                    g.append('path')
+                                .attr('d', d3.svg.symbol().type('triangle-down'))
+                                .attr('fill', '#ff0000')
+                                .attr('transform', `translate(0,${output?6:0})`);
+                }
+            });
+        });
+    },
+    drawChords(chords, innerRadius) {
+        //grouping and appending the Chords
+        const chordsSel = {};
+
+        chordsSel.update = this.canvas.selectAll('.chord path').data(chords);
+
+        chordsSel.enter = chordsSel.update.enter();
+
+        /*
+            TODO:   - Chords color results from the index of target
+                    - There are only 4 colors available
+                    - Can we highlight two way connexions?
+        */
+
+        chordsSel.enter.append('g')
+            .classed('chord', true)
+            .append('path')
+                .attr('d', d3.svg.chord().radius(innerRadius))
+                .style('fill', d => {
+                    return d.source.value>d.target.value ? colorScale(d.source.index) : colorScale(d.target.index);
+                });
+    },
+    drag() {
+        const e = $(ReactDOM.findDOMNode(this));
+
+        const width = e.width();
+        const height = e.height();
+
+        const x1 = width / 2;
+        const y1 = height / 2;
+        const x2 = d3.event.x;
+        const y2 = d3.event.y;
+
+        const newAngle = Math.atan2(y2 - y1, x2 - x1) / (Math.PI / 180);
+
+        this.canvas.attr('transform', `translate(${x1},${y1}) rotate(${newAngle},0,0)`);
+    },
+    // Returns an event handler for fading a given chord group.
+    fade(opacity, i) {
+        this.canvas.selectAll(".chord path")
+                                .filter((d) => d.source.index != i && d.target.index != i)
+                                .transition()
+                                .style("opacity", opacity);
+    },
+    _onChange() {
+        const storeData = ChordsDiagramStore.getData();
+        const state = {loading: storeData.loading};
+
+        if (!storeData.loading && !storeData.error) {
+            const mpr = chordMpr(storeData.data);
+
+            mpr.addValuesToMap('srcip')
+                .addValuesToMap('dstip')
+                .setFilter(function (row, a, b) {
+                    return (row.srcip === a.name && row.dstip === b.name)
+                })
+                .setAccessor(function (recs, a, b) {
+                    if (recs.length==0 || !recs[0]) {
+                        return 0;
+                    }
+
+                    return +recs[0].maxbyte;
+                });
+
+            const matrix = mpr.getMatrix();
+            const map = mpr.getMap();
+
+            state.data = {
+                matrix,
+                map,
+                rdr: chordRdr(matrix, map),
+                ip: ChordsDiagramStore.getIp()
+            };
+        }
+
+        this.replaceState(state);
+    }
 });
 
 module.exports = DetailsChordsPanel;
