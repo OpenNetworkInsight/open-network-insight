@@ -3,32 +3,26 @@ const ReactDOM = require('react-dom');
 const d3 = require('d3');
 const ChordsDiagramStore = require('../stores/ChordsDiagramStore');
 
-function buildTooltip (d, i, chords) {
+function buildTooltip (d, input, output) {
     const p = d3.format(".4%");
 
     var tooltip;
 
     tooltip = `<h5><strong>${d.gname}</strong></h5>`;
-    tooltip+= `<p>${numberFormat(d.gvalue)} Avg Bytes. `;
-    tooltip+= `${p(d.gvalue / d.mtotal)} of Matrix Total (${numberFormat(d.mtotal)})</p>`;
+    tooltip+= `<p>Got ${numberFormat(d.gvalue)} bytes. `;
+    tooltip+= `${p(d.gvalue / d.mtotal)} of matrix total (${numberFormat(d.mtotal)})</p>`;
 
     var toInfo = '', fromInfo = '';
 
-    chords.forEach((d) => {
-        if (d.source.index == i) {
-            if (!d.target.value) return;
+    input.forEach((bytes, i) => {
+        if (bytes==0) return;
 
-            const data = this.state.data.rdr(d);
+        fromInfo += `<li>${numberFormat(bytes)} bytes from ${this.state.data.map[i]}</li>`
+    });
+    output.forEach((bytes, i) => {
+        if (bytes==0) return;
 
-            toInfo += `<li>${numberFormat(data.tvalue)} avg bytes to ${data.tname}</li>`;
-        }
-        else if (d.target.index == i) {
-            if (!d.source.value) return;
-
-            const data = this.state.data.rdr(d);
-
-            fromInfo += `<li>${numberFormat(data.svalue)} avg bytes from ${data.sname}</li>`;
-        }
+        toInfo += `<li>${numberFormat(bytes)} bytes to ${this.state.data.map[i]}</li>`
     });
 
     fromInfo.length && (tooltip+= `<h5><strong>In</strong></h5><ul>${fromInfo}</ul>`);
@@ -75,9 +69,10 @@ const DetailsChordsPanel = React.createClass({
         this.tooltip = d3.tip()
             .attr('class', 'd3-tip')
             .html(({d, i}) => {
-                const chords = this.canvas.selectAll('.chord path').data();
+                const ibytes = this.state.data.matrix[i];
+                const obytes = this.state.data.matrix.map(row => row[i]);
 
-                return buildTooltip.call(this, this.state.data.rdr(d), i, chords);
+                return buildTooltip.call(this, this.state.data.rdr(d), ibytes, obytes);
             });
 
         this.svgSel.call(this.tooltip);
@@ -211,12 +206,6 @@ const DetailsChordsPanel = React.createClass({
 
         chordsSel.enter = chordsSel.update.enter();
 
-        /*
-            TODO:   - Chords color results from the index of target
-                    - There are only 4 colors available
-                    - Can we highlight two way connexions?
-        */
-
         chordsSel.enter.append('g')
             .classed('chord', true)
             .append('path')
@@ -260,19 +249,19 @@ const DetailsChordsPanel = React.createClass({
                     return (row.srcip === a.name && row.dstip === b.name)
                 })
                 .setAccessor(function (recs, a, b) {
-                    if (recs.length==0 || !recs[0]) {
-                        return 0;
-                    }
-
-                    return +recs[0].maxbyte;
+                    return recs.reduce((total, rec) => {
+                        return total + (+rec.avgbyte);
+                    }, 0);
                 });
 
             const matrix = mpr.getMatrix();
             const map = mpr.getMap();
 
+            const ipMap = Object.keys(map).sort((ip1, ip2) => map[ip1].index-map[ip2].index);
+
             state.data = {
                 matrix,
-                map,
+                map: ipMap,
                 rdr: chordRdr(matrix, map),
                 ip: ChordsDiagramStore.getIp()
             };
