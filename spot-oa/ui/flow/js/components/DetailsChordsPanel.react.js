@@ -4,7 +4,7 @@ const d3 = require('d3');
 const ChordsDiagramStore = require('../stores/ChordsDiagramStore');
 
 function buildTooltip (d, input, output) {
-    const p = d3.format(".4%");
+    const p = d3.format(".2%");
 
     var tooltip;
 
@@ -25,8 +25,10 @@ function buildTooltip (d, input, output) {
         toInfo += `<li>${numberFormat(bytes)} bytes to ${this.state.data.map[i]}</li>`
     });
 
+    tooltip += '<div style="max-height: 100px; overflow-y: scroll;">'
     fromInfo.length && (tooltip+= `<h5><strong>In</strong></h5><ul>${fromInfo}</ul>`);
     toInfo.length && (tooltip+= `<h5><strong>Out</strong></h5><ul>${toInfo}</ul>`);
+    tooltip += '</div>';
 
     return tooltip;
 }
@@ -62,11 +64,14 @@ const DetailsChordsPanel = React.createClass({
                         .attr('width', '100%')
                         .attr('height', '100%');
 
-        this.middle = this.svgSel.append('g');
+        const zoom = d3.behavior.zoom().on("zoom", this.onZoom);
+        this.svgSel.call(zoom);
+
         this.canvas = this.svgSel.append('g')
                             .call(dragB);
 
         this.tooltip = d3.tip()
+            .attr('id', 'chords-tooltip')
             .attr('class', 'd3-tip')
             .html(({d, i}) => {
                 const ibytes = this.state.data.matrix[i];
@@ -76,6 +81,38 @@ const DetailsChordsPanel = React.createClass({
             });
 
         this.svgSel.call(this.tooltip);
+
+        d3.select('#chords-tooltip').on('mouseleave', () => {
+            this.tooltip.hide();
+        });
+
+        // Create an arrow marker
+        const defs = this.svgSel.append('defs');
+        defs.append('marker')
+            .attr('id', 'out-arrow-head')
+            .attr('markerWidth', '9')
+            .attr('markerHeight', '6')
+            .attr('refX', '0')
+            .attr('refY', '3')
+            .attr('orient', 'auto')
+            .attr('markerUnits', 'strokeWidth')
+            .attr('viewBox', '0 0 18 3')
+            .append('path')
+                .attr('d', 'M0,0 L0,6 L9,3 z')
+                .attr('fill', '#2ca02c');
+
+        defs.append('marker')
+            .attr('id', 'in-arrow-head')
+            .attr('markerWidth', '9')
+            .attr('markerHeight', '6')
+            .attr('refX', '0')
+            .attr('refY', '3')
+            .attr('orient', 'auto')
+            .attr('markerUnits', 'strokeWidth')
+            .attr('viewBox', '0 0 18 3')
+            .append('path')
+                .attr('d', 'M0,0 L0,6 L9,3 z')
+                .attr('fill', '#ff0000');
     },
     draw() {
         const $svg = $(this.svg);
@@ -84,7 +121,6 @@ const DetailsChordsPanel = React.createClass({
         const width = $svg.width();
         const height = $svg.height();
 
-        this.middle.attr('transform', `translate(${width/2},${height/2})`);
         this.canvas.attr('transform', `translate(${width/2},${height/2})`);
 
         const innerRadius = Math.min(width, height) * .41; //.41 is a magic number for graph stilyng purposes
@@ -103,33 +139,17 @@ const DetailsChordsPanel = React.createClass({
         groupsSel.update = this.canvas.selectAll('g.group').data(groups);
         groupsSel.enter = groupsSel.update.enter();
 
-        const allGroups = groupsSel.enter.append('g')
-                            .classed('group', true)
-                            .on('mouseover', (d, i) => {
-                                const mouseToTheRight = d3.event.layerX>this.tooltip.target[0];
-                                const mouseTotheBottom = d3.event.layerY>this.tooltip.target[1];
-
-                                // Decide where should the tooltip be displayed?
-                                //var direction = mouseTotheBottom ? 'n' : 's';
-                                var direction = mouseToTheRight ? 'w' : 'e';
-
-                                this.tooltip.direction(direction);
-
-                                this.tooltip.show({d, i}, this.middle.node());
-
-                                this.fade(0.1, i);
-                            })
-                            .on('mouseout', (d, i) => {
-                                this.tooltip.hide();
-
-                                this.fade(1, i);
-                            });
+        const allGroups = groupsSel.enter.append('g').attr('class', 'group');
 
         allGroups.append('path')
                    .style('stroke', 'black')
                    .style('fill', d => colorScale(d.index))
                    .style('cursor', 'pointer')
-                   .attr('d', d3.svg.arc().innerRadius(innerRadius).outerRadius(outerRadius));
+                   .attr('d', d3.svg.arc().innerRadius(innerRadius).outerRadius(outerRadius))
+                   .on('mouseover', (d, i) => {
+                       this.fade(0.1, i);
+                   })
+                   .on('mouseout', (d, i) => this.fade(1, i));
 
         const visibleGroups = allGroups.filter((d) => {
             const _d = this.state.data.rdr(d);
@@ -144,59 +164,93 @@ const DetailsChordsPanel = React.createClass({
             );
         });
 
-        visibleGroups.append('text')
-                  .each((d) => { d.angle = (d.startAngle + d.endAngle) / 2; })
-                  .attr('dy', '.35em')
-                  .style('font-family', 'helvetica, arial, sans-serif')
-                  .style('font-size', '12px')
-                  .style('cursor', 'pointer')
-                  .style('font-weight', (d) => {
-                      const _d = this.state.data.rdr(d);
-                      if (_d.gname == this.state.data.ip) {
-                          return '900';
-                      }
-                      return 'normal';
-                  })
-                  .attr('text-anchor', (d) => d.angle > Math.PI ? 'end' : null)
-                  .attr('transform', (d) => {
-                      return 'rotate(' + (d.angle * 180 / Math.PI - 90) + ')'
-                          + 'translate(' + (innerRadius * 1.20) + ')'
-                          + (d.angle > Math.PI ? 'rotate(180)' : '');
-                  })
-                  .text((d) => {
-                      return this.state.data.rdr(d).gname;
-                  });
+        visibleGroups.call(function (selection, component) {
+            const matrix = component.state.data.matrix;
+            const rdr = component.state.data.rdr;
+            const ip = component.state.data.ip;
 
-        visibleGroups.call((selection) => {
-            const matrix = this.state.data.matrix;
+            // TODO: Make sure g and component are in the scope
             selection.each(function (d) {
-                const g = d3.select(this).append('g').attr('transform', (d) => {
-                    return 'rotate(' + (d.angle * 180 / Math.PI - 90) + ')'
-                        + 'translate(' + (innerRadius * 1.15) + ')'
-                        + (d.angle > Math.PI ? 'rotate(180)' : '');
-                });
+                const angle = d.angle = (d.startAngle + d.endAngle) / 2;
 
-                const output = d.value>0;
-                const input = matrix.some(row => {
+                const g = d3.select(this).append('g')
+                    /*
+                        Label positioning
+
+                            1. Rotating according to the groups location
+                            2. Movo towards groups edge
+                            3. Move upside down when appropiate
+                    */
+                    .attr('transform', `rotate(${angle * 180 / Math.PI - 90})`
+                                        + `translate(${outerRadius * 1.1})`
+                                        + (angle > Math.PI ? 'rotate(180)' : '')
+                    );
+
+                const _d = rdr(d);
+                const revert = d.angle > Math.PI;
+                g.append('text')
+                    .attr('transform', `translate(${revert ? -20 : 20}, 0)`)
+                    .attr('dy', '.35em')
+                    .attr('text-anchor', revert ? 'end' : null)
+                    .style('font-family', 'helvetica, arial, sans-serif')
+                    .style('font-size', '12px')
+                    .style('cursor', 'pointer')
+                    .style('font-weight', _d.gname == ip ? '900' : 'normal')
+                    .text(_d.gname)
+                    .on('mouseover', (d, i) => {
+                        const mouseToTheRight = d3.event.layerX>component.tooltip.target[0];
+                        const mouseTotheBottom = d3.event.layerY>component.tooltip.target[1];
+
+                        // Decide where should the tooltip be displayed?
+                        var direction = mouseToTheRight ? 'w' : 'e';
+
+                        component.tooltip.direction(direction);
+
+                        component.tooltip.show({d, i});
+                    })
+                    .on('mouseout', (d, i) => {
+                        if (d3.event.relatedTarget.id!=component.tooltip.attr('id'))
+                        {
+                            component.tooltip.hide();
+                        }
+                    });
+
+                const input = d.value>0;
+                const output = matrix.some(row => {
                     return row[d.index]>0;
                 });
 
+                const arrowG = g.append('g')
+                                .attr('transform', 'scale(.5,.5)');
+
+                const verticalOffset = output && input;
+
                 if (output) {
                     // Group has sent some data
-                    g.append('path')
-                                .attr('d', d3.svg.symbol().type('triangle-up'))
-                                .attr('fill', '#00ff00')
-                                .attr('transform', `translate(0,${input?-6:3})`);
+                    arrowG.append('line')
+                        .attr('x1', revert ? -20 : 20)
+                        .attr('y1', '0')
+                        .attr('x2', '0')
+                        .attr('y2', '0')
+                        .attr('stroke', '#000')
+                        .attr('stroke-width', '3')
+                        .attr('transform', `translate(${revert?-5:5},${verticalOffset?-8:0})`)
+                        .attr('marker-end', 'url(#out-arrow-head)');
                 }
 
                 if (input) {
-                    g.append('path')
-                                .attr('d', d3.svg.symbol().type('triangle-down'))
-                                .attr('fill', '#ff0000')
-                                .attr('transform', `translate(0,${output?6:0})`);
+                    arrowG.append('line')
+                        .attr('x1', '0')
+                        .attr('y1', '0')
+                        .attr('x2', revert ? -20 : 20)
+                        .attr('y2', '0')
+                        .attr('stroke', '#000')
+                        .attr('stroke-width', '3')
+                        .attr('transform', `translate(${revert?5:-5},${verticalOffset?8:0})`)
+                        .attr('marker-end', 'url(#in-arrow-head)');
                 }
             });
-        });
+        }, this);
     },
     drawChords(chords, innerRadius) {
         //grouping and appending the Chords
@@ -207,12 +261,22 @@ const DetailsChordsPanel = React.createClass({
         chordsSel.enter = chordsSel.update.enter();
 
         chordsSel.enter.append('g')
-            .classed('chord', true)
+            .attr('class', 'chord')
+            .on('mouseover', (d, i) => {
+                this.fade(0.1, d.source.index);
+            })
+            .on('mouseout', (d, i) => this.fade(1))
             .append('path')
                 .attr('d', d3.svg.chord().radius(innerRadius))
                 .style('fill', d => {
                     return d.source.value>d.target.value ? colorScale(d.source.index) : colorScale(d.target.index);
                 });
+    },
+    onZoom() {
+        const translate = d3.event.translate;
+        const scale = d3.event.scale;
+
+        this.canvas.attr('transform', `translate(${translate})scale(${scale})`);
     },
     drag() {
         const e = $(ReactDOM.findDOMNode(this));
