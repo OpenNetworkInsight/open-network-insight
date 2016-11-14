@@ -56,19 +56,18 @@ const DetailsChordsPanel = React.createClass({
             .sortSubgroups(d3.descending)
             .matrix(this.state.data.matrix);
 
-        const dragB = d3.behavior.drag()
-                        .on('drag', this.drag);
-
         // Main SVG
         this.svgSel = d3.select(this.svg)
                         .attr('width', '100%')
                         .attr('height', '100%');
 
-        const zoom = d3.behavior.zoom().on("zoom", this.onZoom);
-        this.svgSel.call(zoom);
+        this.zoom = d3.behavior.zoom().on('zoom', this.onZoom);
+        this.svgSel.call(this.zoom);
 
-        this.canvas = this.svgSel.append('g')
-                            .call(dragB);
+        this.canvas = this.svgSel.append('g');
+
+        const dragB = d3.behavior.drag().on('drag', this.drag).on('dragstart', this.dragStart);
+        this.canvas.call(dragB);
 
         this.tooltip = d3.tip()
             .attr('id', 'chords-tooltip')
@@ -121,7 +120,12 @@ const DetailsChordsPanel = React.createClass({
         const width = $svg.width();
         const height = $svg.height();
 
-        this.canvas.attr('transform', `translate(${width/2},${height/2})`);
+
+        const transform = d3.transform();
+        transform.translate = [width/2,height/2];
+
+        this.zoom.translate(transform.translate);
+        this.canvas.attr('transform', transform.toString());
 
         const innerRadius = Math.min(width, height) * .41; //.41 is a magic number for graph stilyng purposes
         const outerRadius = innerRadius * 1.1; //1.1 is a magic number for graph stilyng purposes
@@ -169,7 +173,6 @@ const DetailsChordsPanel = React.createClass({
             const rdr = component.state.data.rdr;
             const ip = component.state.data.ip;
 
-            // TODO: Make sure g and component are in the scope
             selection.each(function (d) {
                 const angle = d.angle = (d.startAngle + d.endAngle) / 2;
 
@@ -273,25 +276,55 @@ const DetailsChordsPanel = React.createClass({
                 });
     },
     onZoom() {
-        const translate = d3.event.translate;
-        const scale = d3.event.scale;
+        const transform = d3.transform();
 
-        this.canvas.attr('transform', `translate(${translate})scale(${scale})`);
+        transform.scale = d3.event.scale;
+        transform.translate = d3.event.translate;
+
+        this.canvas.attr('transform', transform.toString());
+    },
+    dragStart() {
+        const transform = d3.transform(this.canvas.attr('transform'));
+
+        // Coordinates with respect of translation point
+        const x = d3.event.sourceEvent.layerX - transform.translate[0];
+        const y = d3.event.sourceEvent.layerY - transform.translate[1];
+
+        // Angle of calculated point
+        var angle = Math.atan2(-y, x);
+
+        // Translate to degrees
+        angle = angle < 0 ? 2 * Math.PI + angle : angle;
+        angle = angle * 180 / Math.PI;
+
+        // Store value for future reference
+        this.lastAngle = angle;
     },
     drag() {
-        const e = $(ReactDOM.findDOMNode(this));
+        d3.event.sourceEvent.preventDefault();
+        d3.event.sourceEvent.stopPropagation();
+        d3.event.sourceEvent.stopImmediatePropagation();
 
-        const width = e.width();
-        const height = e.height();
+        const transform = d3.transform(this.canvas.attr('transform'));
 
-        const x1 = width / 2;
-        const y1 = height / 2;
-        const x2 = d3.event.x;
-        const y2 = d3.event.y;
+        // Coordinates with respect of translation point
+        const x = d3.event.x - transform.translate[0];
+        const y = d3.event.y - transform.translate[1];
 
-        const newAngle = Math.atan2(y2 - y1, x2 - x1) / (Math.PI / 180);
+        // Angle of calculated point
+        var angle = Math.atan2(-y, x);
 
-        this.canvas.attr('transform', `translate(${x1},${y1}) rotate(${newAngle},0,0)`);
+        // Translate to degrees
+        angle = angle < 0 ? 2 * Math.PI + angle : angle;
+        angle = angle * 180 / Math.PI;
+
+        // Rotate diagram N degrees
+        transform.rotate = transform.rotate + (this.lastAngle - angle);
+
+        // Store value for future reference
+        this.lastAngle = angle;
+
+        this.canvas.attr('transform', transform.toString());
     },
     // Returns an event handler for fading a given chord group.
     fade(opacity, i) {
