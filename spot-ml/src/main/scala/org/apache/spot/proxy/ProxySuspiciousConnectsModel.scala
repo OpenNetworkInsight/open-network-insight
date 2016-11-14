@@ -6,9 +6,8 @@ import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.apache.spot.SpotLDACWrapper.{SpotLDACInput, SpotLDACOutput}
-import org.apache.spot.SpotSparkLDAWrapper
-import org.apache.spot.SpotSparkLDAWrapper.{SpotSparkLDAInput, SpotSparkLDAOutput}
+import org.apache.spot.SpotLDAWrapper
+import org.apache.spot.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
 import org.apache.spot.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.apache.spot.proxy.ProxySchema._
 import org.apache.spot.utilities._
@@ -116,57 +115,40 @@ object ProxySuspiciousConnectsModel {
     val agentCuts =
       Quantiles.computeQuintiles(df.select(UserAgent).rdd.map({ case Row(agent: String) => agentToCountBC.value(agent) }))
 
-    if (config.ldaImplementation == "LDAC") {
-      val docWordCount: RDD[SpotLDACInput] =
-        getIPWordCounts(sparkContext, sqlContext, logger, df, config.scoresFile, config.duplicationFactor, agentToCount, timeCuts, entropyCuts, agentCuts)
+    val docWordCount: RDD[SpotLDAInput] =
+      getIPWordCounts(sparkContext, sqlContext, logger, df, config.scoresFile, config.duplicationFactor, agentToCount, timeCuts, entropyCuts, agentCuts)
 
 
-      val SpotLDACOutput(documentResults, wordResults) = SpotLDACWrapper.runLDA(docWordCount,
-        config.modelFile,
-        config.topicDocumentFile,
-        config.topicWordFile,
-        config.mpiPreparationCmd,
-        config.mpiCmd,
-        config.mpiProcessCount,
-        config.topicCount,
-        config.localPath,
-        config.ldaPath,
-        config.localUser,
-        config.analysis,
-        config.nodes,
-        config.ldaPRGSeed)
+    val SpotLDAOutput(documentResults, wordResults) = SpotLDAWrapper.runLDA(docWordCount,
+      config.modelFile,
+      config.topicDocumentFile,
+      config.topicWordFile,
+      config.mpiPreparationCmd,
+      config.mpiCmd,
+      config.mpiProcessCount,
+      config.topicCount,
+      config.localPath,
+      config.ldaPath,
+      config.localUser,
+      config.analysis,
+      config.nodes,
+      config.ldaImplementation,
+      logger,
+      "em",
+      2.5,
+      1.1,
+      120,
+      config.ldaPRGSeed)
 
-      new ProxySuspiciousConnectsModel(config.topicCount, documentResults, wordResults, timeCuts, entropyCuts, agentCuts)
-    } else {
-      val docWordCount: RDD[SpotSparkLDAInput] =
-        getIPWordCountsSpark(sparkContext, sqlContext, logger, df, config.scoresFile, config.duplicationFactor, agentToCount, timeCuts, entropyCuts, agentCuts)
-
-
-      val SpotSparkLDAOutput(documentResults, wordResults) = SpotSparkLDAWrapper.runLDA(docWordCount,
-        config.modelFile,
-        config.topicDocumentFile,
-        config.topicWordFile,
-        config.topicCount,
-        config.localPath,
-        config.ldaPath,
-        config.localUser,
-        config.analysis,
-        config.ldaPRGSeed,
-        "em",
-        2.5,
-        1.1,
-        120)
-
-      new ProxySuspiciousConnectsModel(config.topicCount, documentResults, wordResults, timeCuts, entropyCuts, agentCuts)
-    }
+    new ProxySuspiciousConnectsModel(config.topicCount, documentResults, wordResults, timeCuts, entropyCuts, agentCuts)
 
   }
 
   /**
     * Transform proxy log events into summarized words and aggregate into IP-word counts.
-    * Returned as [[SpotLDACInput]] objects.
+    * Returned as [[SpotLDAInput]] objects.
     *
-    * @return RDD of [[SpotLDACInput]] objects containing the aggregated IP-word counts.
+    * @return RDD of [[SpotLDAInput]] objects containing the aggregated IP-word counts.
     */
   def getIPWordCounts(sc: SparkContext,
                       sqlContext: SQLContext,
@@ -177,7 +159,7 @@ object ProxySuspiciousConnectsModel {
                       agentToCount: Map[String, Long],
                       timeCuts: Array[Double],
                       entropyCuts: Array[Double],
-                      agentCuts: Array[Double]): RDD[SpotLDACInput] = {
+                      agentCuts: Array[Double]): RDD[SpotLDAInput] = {
 
 
     logger.info("Read source data")
@@ -189,33 +171,12 @@ object ProxySuspiciousConnectsModel {
     wc
   }
 
-  def getIPWordCountsSpark(sc: SparkContext,
-                      sqlContext: SQLContext,
-                      logger: Logger,
-                      inDF: DataFrame,
-                      feedbackFile: String,
-                      duplicationFactor: Int,
-                      agentToCount: Map[String, Long],
-                      timeCuts: Array[Double],
-                      entropyCuts: Array[Double],
-                      agentCuts: Array[Double]): RDD[SpotSparkLDAInput] = {
-
-
-    logger.info("Read source data")
-    val df = inDF.select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
-
-    val wc = ipWordCountFromDFSpark(sc, df, agentToCount, timeCuts, entropyCuts, agentCuts)
-    logger.info("proxy pre LDA completed")
-
-    wc
-  }
-
   def ipWordCountFromDF(sc: SparkContext,
                         dataFrame: DataFrame,
                         agentToCount: Map[String, Long],
                         timeCuts: Array[Double],
                         entropyCuts: Array[Double],
-                        agentCuts: Array[Double]): RDD[SpotLDACInput] = {
+                        agentCuts: Array[Double]): RDD[SpotLDAInput] = {
 
     val topDomains: Broadcast[Set[String]] = sc.broadcast(TopDomains.TopDomains)
 
@@ -233,32 +194,6 @@ object ProxySuspiciousConnectsModel {
       select(ClientIP, Word)
 
     ipWordDF.rdd.map({ case Row(ip, word) => ((ip.asInstanceOf[String], word.asInstanceOf[String]), 1) })
-      .reduceByKey(_ + _).map({ case ((ip, word), count) => SpotLDACInput(ip, word, count) })
-  }
-
-  def ipWordCountFromDFSpark(sc: SparkContext,
-                        dataFrame: DataFrame,
-                        agentToCount: Map[String, Long],
-                        timeCuts: Array[Double],
-                        entropyCuts: Array[Double],
-                        agentCuts: Array[Double]): RDD[SpotSparkLDAInput] = {
-
-    val topDomains: Broadcast[Set[String]] = sc.broadcast(TopDomains.TopDomains)
-
-    val agentToCountBC = sc.broadcast(agentToCount)
-    val udfWordCreation = ProxyWordCreation.udfWordCreation(topDomains, agentToCountBC, timeCuts, entropyCuts, agentCuts)
-
-    val ipWordDF = dataFrame.withColumn(Word,
-      udfWordCreation(dataFrame(Host),
-        dataFrame(Time),
-        dataFrame(ReqMethod),
-        dataFrame(FullURI),
-        dataFrame(ResponseContentType),
-        dataFrame(UserAgent),
-        dataFrame(RespCode))).
-      select(ClientIP, Word)
-
-    ipWordDF.rdd.map({ case Row(ip, word) => ((ip.asInstanceOf[String], word.asInstanceOf[String]), 1) })
-      .reduceByKey(_ + _).map({ case ((ip, word), count) => SpotSparkLDAInput(ip, word, count) })
+      .reduceByKey(_ + _).map({ case ((ip, word), count) => SpotLDAInput(ip, word, count) })
   }
 }
