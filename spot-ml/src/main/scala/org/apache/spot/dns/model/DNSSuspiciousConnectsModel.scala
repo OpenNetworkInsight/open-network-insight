@@ -6,8 +6,8 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.apache.spot.SpotLDACWrapper
-import org.apache.spot.SpotLDACWrapper.{SpotLDACInput, SpotLDACOutput}
+import org.apache.spot.SpotLDAWrapper
+import org.apache.spot.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
 import org.apache.spot.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.apache.spot.dns.DNSSchema._
 import org.apache.spot.dns.DNSWordCreation
@@ -46,7 +46,8 @@ class DNSSuspiciousConnectsModel(inTopicCount: Int,
                                  inFrameLengthCuts: Array[Double],
                                  inSubdomainLengthCuts: Array[Double],
                                  inNumberPeriodsCuts: Array[Double],
-                                 inEntropyCuts: Array[Double]) {
+                                 inEntropyCuts: Array[Double],
+                                 inLdaDistributor: String ) {
 
   val topicCount = inTopicCount
   val ipToTopicMix = inIpToTopicMix
@@ -56,7 +57,7 @@ class DNSSuspiciousConnectsModel(inTopicCount: Int,
   val subdomainLengthCuts = inSubdomainLengthCuts
   val numberPeriodsCuts = inNumberPeriodsCuts
   val entropyCuts = inEntropyCuts
-
+  val ldaDistributor = inLdaDistributor
   /**
     * Use a suspicious connects model to assign estimated probabilities to a dataframe of
     * DNS log events.
@@ -145,7 +146,8 @@ object DNSSuspiciousConnectsModel {
                     logger: Logger,
                     config: SuspiciousConnectsConfig,
                     inDF: DataFrame,
-                    topicCount: Int): DNSSuspiciousConnectsModel = {
+                    topicCount: Int,
+                    ldaDistributor: String = "mpi" ): DNSSuspiciousConnectsModel = {
 
     logger.info("Training DNS suspicious connects model from " + config.inputPath)
 
@@ -178,7 +180,6 @@ object DNSSuspiciousConnectsModel {
     val numberPeriodsCuts = Quantiles.computeQuintiles(domainStatsDF.filter(NumPeriods + " > 0")
       .select(NumPeriods).rdd.map({ case Row(numberPeriods: Int) => numberPeriods.toDouble }))
 
-
     // simplify DNS log entries into "words"
 
     val dnsWordCreator = new DNSWordCreation(frameLengthCuts, timeCuts, subdomainLengthCuts, entropyCuts, numberPeriodsCuts, topDomainsBC)
@@ -186,14 +187,12 @@ object DNSSuspiciousConnectsModel {
     val dataWithWordDF = totalDataDF.withColumn(Word, dnsWordCreator.wordCreationUDF(modelColumns: _*))
 
     // aggregate per-word counts at each IP
-
     val ipDstWordCounts =
-      dataWithWordDF.select(ClientIP, Word).map({ case Row(destIP: String, word: String) => (destIP, word) -> 1 })
-        .reduceByKey(_ + _)
-        .map({ case ((ipDst, word), count) => SpotLDACInput(ipDst, word, count) })
+    dataWithWordDF.select(ClientIP, Word).map({ case Row(destIP: String, word: String) => (destIP, word) -> 1 })
+      .reduceByKey(_ + _)
+      .map({ case ((ipDst, word), count) => SpotLDAInput(ipDst, word, count) })
 
-
-    val SpotLDACOutput(ipToTopicMix, wordToPerTopicProb) = SpotLDACWrapper.runLDA(ipDstWordCounts,
+    val SpotLDAOutput(ipToTopicMix, wordToPerTopicProb) = SpotLDAWrapper.runLDA(ipDstWordCounts,
       config.modelFile,
       config.topicDocumentFile,
       config.topicWordFile,
@@ -206,6 +205,12 @@ object DNSSuspiciousConnectsModel {
       config.localUser,
       config.analysis,
       config.nodes,
+      config.ldaImplementation,
+      logger,
+      "em",
+      2.5,
+      1.1,
+      120,
       config.ldaPRGSeed)
 
 
@@ -216,7 +221,9 @@ object DNSSuspiciousConnectsModel {
       frameLengthCuts,
       subdomainLengthCuts,
       numberPeriodsCuts,
-      entropyCuts)
+      entropyCuts,
+      ldaDistributor )
+
   }
 
   /**
