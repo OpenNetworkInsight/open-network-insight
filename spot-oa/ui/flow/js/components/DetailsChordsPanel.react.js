@@ -145,115 +145,105 @@ const DetailsChordsPanel = React.createClass({
 
         const allGroups = groupsSel.enter.append('g').attr('class', 'group');
 
+        const component = this;
+
         allGroups.append('path')
                    .style('stroke', 'black')
                    .style('fill', d => colorScale(d.index))
                    .style('cursor', 'pointer')
                    .attr('d', d3.svg.arc().innerRadius(innerRadius).outerRadius(outerRadius))
-                   .on('mouseover', (d, i) => {
-                       this.fade(0.1, i);
-                   })
-                   .on('mouseout', (d, i) => this.fade(1, i));
+                   .on('mouseover', (d, i) => component.fade(0.1, i))
+                   .on('mouseout', (d, i) => component.fade(1, i));
 
-        const visibleGroups = allGroups.filter((d) => {
-            const _d = this.state.data.rdr(d);
+        const matrix = this.state.data.matrix;
+        const rdr = this.state.data.rdr;
+        const ip = this.state.data.ip;
 
-            // 1. Display every ip when they are 10 or less
-            // 2. Always display current threat
-            // 3. Filter ips with less than 0.5%
-            return (
-                this.state.data.matrix.length <= 10
-                || _d.gname == this.state.data.ip
-                || _d.gvalue / _d.mtotal > 0.005
-            );
-        });
+        allGroups.each(function (d, i){
+            const angle = (d.startAngle + d.endAngle) / 2;
 
-        visibleGroups.call(function (selection, component) {
-            const matrix = component.state.data.matrix;
-            const rdr = component.state.data.rdr;
-            const ip = component.state.data.ip;
+            const g = d3.select(this).append('g')
+                .attr('transform', `rotate(${angle * 180 / Math.PI - 90})`
+                                    + `translate(${outerRadius * 1.1})`
+                                    + (angle > Math.PI ? 'rotate(180)' : '')
+                );
 
-            selection.each(function (d) {
-                const angle = d.angle = (d.startAngle + d.endAngle) / 2;
+            // Hide some ips when they are more than 10
+            if (matrix.length > 10)
+            {
+                g.classed('hidden', (d) => {
+                    const _d = rdr(d);
 
-                const g = d3.select(this).append('g')
-                    /*
-                        Label positioning
+                    // 1. Filter ips with less than 0.5%
+                    // 2. Always display current threat
+                    return _d.gvalue / _d.mtotal <= 0.005 && _d.gname != ip;
+                });
+            }
 
-                            1. Rotating according to the groups location
-                            2. Movo towards groups edge
-                            3. Move upside down when appropiate
-                    */
-                    .attr('transform', `rotate(${angle * 180 / Math.PI - 90})`
-                                        + `translate(${outerRadius * 1.1})`
-                                        + (angle > Math.PI ? 'rotate(180)' : '')
-                    );
+            const _d = rdr(d);
+            const revert = angle > Math.PI;
+            g.append('text')
+                .attr('transform', `translate(${revert ? -20 : 20}, 0)`)
+                .attr('dy', '.35em')
+                .attr('text-anchor', revert ? 'end' : null)
+                .style('font-family', 'helvetica, arial, sans-serif')
+                .style('font-size', '12px')
+                .style('cursor', 'pointer')
+                .style('font-weight', _d.gname == ip ? '900' : 'normal')
+                .text(_d.gname)
+                .on('mouseover', () => {
+                    const mouseToTheRight = d3.event.layerX>component.tooltip.target[0];
+                    const mouseTotheBottom = d3.event.layerY>component.tooltip.target[1];
 
-                const _d = rdr(d);
-                const revert = d.angle > Math.PI;
-                g.append('text')
-                    .attr('transform', `translate(${revert ? -20 : 20}, 0)`)
-                    .attr('dy', '.35em')
-                    .attr('text-anchor', revert ? 'end' : null)
-                    .style('font-family', 'helvetica, arial, sans-serif')
-                    .style('font-size', '12px')
-                    .style('cursor', 'pointer')
-                    .style('font-weight', _d.gname == ip ? '900' : 'normal')
-                    .text(_d.gname)
-                    .on('mouseover', (d, i) => {
-                        const mouseToTheRight = d3.event.layerX>component.tooltip.target[0];
-                        const mouseTotheBottom = d3.event.layerY>component.tooltip.target[1];
+                    // Decide where should the tooltip be displayed?
+                    var direction = mouseToTheRight ? 'w' : 'e';
 
-                        // Decide where should the tooltip be displayed?
-                        var direction = mouseToTheRight ? 'w' : 'e';
+                    component.tooltip.direction(direction);
 
-                        component.tooltip.direction(direction);
-
-                        component.tooltip.show({d, i});
-                    })
-                    .on('mouseout', (d, i) => {
-                        if (d3.event.relatedTarget.id!=component.tooltip.attr('id'))
-                        {
-                            component.tooltip.hide();
-                        }
-                    });
-
-                const input = d.value>0;
-                const output = matrix.some(row => {
-                    return row[d.index]>0;
+                    component.tooltip.show({d, i});
+                })
+                .on('mouseout', () => {
+                    if (d3.event.relatedTarget.id!=component.tooltip.attr('id'))
+                    {
+                        component.tooltip.hide();
+                    }
                 });
 
-                const arrowG = g.append('g')
-                                .attr('transform', 'scale(.5,.5)');
-
-                const verticalOffset = output && input;
-
-                if (output) {
-                    // Group has sent some data
-                    arrowG.append('line')
-                        .attr('x1', revert ? -20 : 20)
-                        .attr('y1', '0')
-                        .attr('x2', '0')
-                        .attr('y2', '0')
-                        .attr('stroke', '#000')
-                        .attr('stroke-width', '3')
-                        .attr('transform', `translate(${revert?-5:5},${verticalOffset?-8:0})`)
-                        .attr('marker-end', 'url(#out-arrow-head)');
-                }
-
-                if (input) {
-                    arrowG.append('line')
-                        .attr('x1', '0')
-                        .attr('y1', '0')
-                        .attr('x2', revert ? -20 : 20)
-                        .attr('y2', '0')
-                        .attr('stroke', '#000')
-                        .attr('stroke-width', '3')
-                        .attr('transform', `translate(${revert?5:-5},${verticalOffset?8:0})`)
-                        .attr('marker-end', 'url(#in-arrow-head)');
-                }
+            const input = d.value>0;
+            const output = matrix.some(row => {
+                return row[d.index]>0;
             });
-        }, this);
+
+            const arrowG = g.append('g')
+                            .attr('transform', 'scale(.5,.5)');
+
+            const verticalOffset = output && input;
+
+            if (output) {
+                // Group has sent some data
+                arrowG.append('line')
+                    .attr('x1', revert ? -20 : 20)
+                    .attr('y1', '0')
+                    .attr('x2', '0')
+                    .attr('y2', '0')
+                    .attr('stroke', '#000')
+                    .attr('stroke-width', '3')
+                    .attr('transform', `translate(${revert?-5:5},${verticalOffset?-8:0})`)
+                    .attr('marker-end', 'url(#out-arrow-head)');
+            }
+
+            if (input) {
+                arrowG.append('line')
+                    .attr('x1', '0')
+                    .attr('y1', '0')
+                    .attr('x2', revert ? -20 : 20)
+                    .attr('y2', '0')
+                    .attr('stroke', '#000')
+                    .attr('stroke-width', '3')
+                    .attr('transform', `translate(${revert?5:-5},${verticalOffset?8:0})`)
+                    .attr('marker-end', 'url(#in-arrow-head)');
+            }
+        });
     },
     drawChords(chords, innerRadius) {
         //grouping and appending the Chords
@@ -266,6 +256,7 @@ const DetailsChordsPanel = React.createClass({
         chordsSel.enter.append('g')
             .attr('class', 'chord')
             .on('mouseover', (d, i) => {
+                // TODO: Make sure source and destination ip are visible. Unhide when hidden
                 this.fade(0.1, d.source.index);
             })
             .on('mouseout', (d, i) => this.fade(1))
@@ -276,7 +267,7 @@ const DetailsChordsPanel = React.createClass({
                 });
     },
     onZoom() {
-        const transform = d3.transform();
+        const transform = d3.transform(this.canvas.attr('transform'));
 
         transform.scale = d3.event.scale;
         transform.translate = d3.event.translate;
@@ -347,7 +338,7 @@ const DetailsChordsPanel = React.createClass({
                 })
                 .setAccessor(function (recs, a, b) {
                     return recs.reduce((total, rec) => {
-                        return total + (+rec.avgbyte);
+                        return total + (+rec.ibytes);
                     }, 0);
                 });
 
