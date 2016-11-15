@@ -69,21 +69,25 @@ const DetailsChordsPanel = React.createClass({
         const dragB = d3.behavior.drag().on('drag', this.drag).on('dragstart', this.dragStart);
         this.canvas.call(dragB);
 
-        this.tooltip = d3.tip()
-            .attr('id', 'chords-tooltip')
-            .attr('class', 'd3-tip')
-            .html(({d, i}) => {
-                const ibytes = this.state.data.matrix[i];
-                const obytes = this.state.data.matrix.map(row => row[i]);
+        if (!this.tooltip) {
+            this.tooltip = d3.tip()
+                .attr('id', 'chords-tooltip')
+                .attr('class', 'd3-tip')
+                .html(({d, i}) => {
+                    const ibytes = this.state.data.matrix[i];
+                    const obytes = this.state.data.matrix.map(row => row[i]);
 
-                return buildTooltip.call(this, this.state.data.rdr(d), ibytes, obytes);
+                    return buildTooltip.call(this, this.state.data.rdr(d), ibytes, obytes);
+                });
+
+            this.svgSel.call((selection) => {
+                this.tooltip(selection);
+
+                d3.select('#chords-tooltip').on('mouseleave', () => {
+                    this.tooltip.hide();
+                });
             });
-
-        this.svgSel.call(this.tooltip);
-
-        d3.select('#chords-tooltip').on('mouseleave', () => {
-            this.tooltip.hide();
-        });
+        }
 
         // Create an arrow marker
         const defs = this.svgSel.append('defs');
