@@ -255,11 +255,8 @@ const DetailsChordsPanel = React.createClass({
 
         chordsSel.enter.append('g')
             .attr('class', 'chord')
-            .on('mouseover', (d, i) => {
-                // TODO: Make sure source and destination ip are visible. Unhide when hidden
-                this.fade(0.1, d.source.index);
-            })
-            .on('mouseout', (d, i) => this.fade(1))
+            .on('mouseover', d => this.fade(0.1, d.source.index))
+            .on('mouseout', d => this.fade(1))
             .append('path')
                 .attr('d', d3.svg.chord().radius(innerRadius))
                 .style('fill', d => {
