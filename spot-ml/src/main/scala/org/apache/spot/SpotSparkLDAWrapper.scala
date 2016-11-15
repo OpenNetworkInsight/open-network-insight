@@ -15,6 +15,14 @@ import scala.collection.Map
 import scala.io.Source._
 import scala.sys.process._
 
+/**
+  * Spark LDA implementation
+  * Contains routines for LDA using Scala Spark implementation from mllib
+  * 1. Creates list of unique documents, words and model based on those two
+  * 2. Processes the model using Spark LDA
+  * 3. Reads Spark LDA results: Topic distributions per document (docTopicDist) and word distributions per topic (wordTopicMat)
+  * 4. Convert wordTopicMat (Matrix) and docTopicDist (RDD) to appropriate formats (maps) originally specified in LDA-C
+  */
 
 object SpotSparkLDAWrapper {
 
@@ -48,18 +56,10 @@ object SpotSparkLDAWrapper {
         .map(kv => (kv._2, kv._1))
         .toMap
     }
-    val docStrToID = documentDictionary.map(_.swap)
-
-    //Convert SpotSparkLDAInput into desired format for Spark LDA: (doc, word, count) -> word count per doc, where RDD
-    //is indexed by DocID
-    val wordCountsPerDoc : RDD[(Long, Iterable[(Int, Double)])]
-    = docWordCount.map({case SpotLDAInput(doc, word, count) => (docStrToID(doc).toLong, (wordDictionary(word), count.toDouble))}).groupByKey
-
-    //Sum of distinct words in each doc (words will be repeated between different docs), used for sparse vec size
-    val numUniqWords = wordDictionary.size
+    val docStrToID: Map[String, Int] = documentDictionary.map(_.swap)
 
     //Structure corpus so that the index is the docID, values are the vectors of word occurrences in that doc
-    val ldaCorpus: RDD[(Long, Vector)] = wordCountsPerDoc.mapValues({case vs => Vectors.sparse(numUniqWords,vs.toSeq)})
+    val ldaCorpus: RDD[(Long, Vector)] = formatSparkLDAInput(docWordCount, docStrToID, wordDictionary)
 
     //Instantiate optimizer based on input
     val optimizer = ldaOptimizer match {
@@ -74,12 +74,14 @@ object SpotSparkLDAWrapper {
     val lda =
       new LDA().setK(topicCount).setMaxIterations(maxIterations).setAlpha(ldaAlpha).setBeta(ldaBeta).setOptimizer(optimizer)
 
+    //If seed not set, the automatically set to hash value of class name
     def unrollSeed(opt: Option[Long]): Long = opt getOrElse -1L
     val ldaSeedLong = unrollSeed(ldaSeed)
     if ( ldaSeedLong != -1 ) lda.setSeed(ldaSeedLong)
 
     //Create LDA model
     val ldaModel = lda.run(ldaCorpus)
+
     //Convert to DistributedLDAModel to expose info about topic distribution
     val distLDAModel = ldaModel.asInstanceOf[DistributedLDAModel]
 
@@ -93,24 +95,36 @@ object SpotSparkLDAWrapper {
     val docTopicDist: RDD[(Long, Vector)] = distLDAModel.topicDistributions
 
     //Create doc results from vector: convert docID back to string, convert vector of probabilities to array
-    val docToTopicMix: scala.Predef.Map[String, Array[Double]] = docTopicDist.map({case(docID, topicVal) => (documentDictionary(docID.toInt), topicVal.toArray)}).collect.toMap
+    val docToTopicMix: scala.Predef.Map[String, Array[Double]] = formatSparkLDADocTopicOutput(docTopicDist, documentDictionary)
 
     //Create word results from matrix: convert matrix to sequence, wordIDs back to strings, sequence of probabilities to array
     val revWordMap: Map[Int, String] = wordDictionary.map(_.swap)
 
-    val wordResults = wordTopicMat.toArray.grouped(wordTopicMat.numCols).zipWithIndex.toSeq.map({case (topicProbs, wordInd) => (revWordMap(wordInd), topicProbs)}).toMap
+    val wordResults = formatSparkLDAWordOutput(wordTopicMat, revWordMap)
 
     //Create output object
     SpotLDAOutput(docToTopicMix, wordResults)
   }
 
-  /**
-    * Spark LDA implementation
-    * Contains routines for LDA using Scala Spark implementation from mllib
-    * 1. Creates list of unique documents, words and model based on those two
-    * 2. Processes the model using Spark LDA
-    * 3. Reads Spark LDA results: Topic distributions per document (docTopicDist) and word distributions per topic (wordTopicMat)
-    * 4. Convert wordTopicMat (Matrix) and docTopicDist (RDD) to appropriate formats (maps) originally specified in LDA-C
-    */
+  def formatSparkLDAInput(docWordCount: RDD[SpotLDAInput], docStrToID: Map[String, Int], wordDictionary: Map[String, Int] ):  RDD[(Long, Vector)] = {
+    //Convert SpotSparkLDAInput into desired format for Spark LDA: (doc, word, count) -> word count per doc, where RDD
+    //is indexed by DocID
+    val wordCountsPerDoc : RDD[(Long, Iterable[(Int, Double)])]
+    = docWordCount.map({case SpotLDAInput(doc, word, count) => (docStrToID(doc).toLong, (wordDictionary(word), count.toDouble))}).groupByKey
+
+    //Sum of distinct words in each doc (words will be repeated between different docs), used for sparse vec size
+    val numUniqWords = wordDictionary.size
+    val ldaInput: RDD[(Long, Vector)] = wordCountsPerDoc.mapValues({case vs => Vectors.sparse(numUniqWords,vs.toSeq)})
+
+    ldaInput
+  }
+
+  def formatSparkLDAWordOutput(wordTopMat: Matrix, wordMap: Map[Int, String]) : scala.Predef.Map[String, Array[Double]] = {
+    wordTopMat.toArray.grouped(wordTopMat.numCols).zipWithIndex.toSeq.map({case (topicProbs, wordInd) => (wordMap(wordInd), topicProbs)}).toMap
+  }
+
+  def formatSparkLDADocTopicOutput(docTopDist: RDD[(Long, Vector)], docDict: Map[Int, String] ): scala.Predef.Map[String, Array[Double]] = {
+     docTopDist.map({case(docID, topicVal) => (docDict(docID.toInt), topicVal.toArray)}).collect.toMap
+  }
 
 }

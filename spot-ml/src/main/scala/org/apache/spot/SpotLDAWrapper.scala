@@ -9,11 +9,12 @@ import scala.sys.process._
 import org.apache.log4j.Logger
 
 /**
-  * Contains routines for LDA including pre and post operations
-  * 1. Creates list of unique documents, words and model based on those two
-  * 2. Processes the model calling MPI
-  * 3. Reads MPI results: Topic distributions per document and words per topic
-  * 4. Calculates and returns probability of word given topic: p(w|z)
+  * Spot LDA Overall Wrapper
+  * Wraps SpotSparkLDAWrapper and SpotLDACWrapper so that there can be a single interface for flow, dns, and proxy
+  * 1. SpotLDAWrapper input and output have the same components as SpotLDACWrapper and SpotSparkWrapper
+  * 2. Determines which version of LDA (LDAC or Spark) to call based on the input parameter, ldaImplemention
+  * 3. Converts SpotLDAWrapper input into correct version and calls appropriate version of runLDA
+  * 4. Converts output to generic SpotLDAOutput for further processing
   */
 
 object SpotLDAWrapper {
@@ -74,14 +75,6 @@ object SpotLDAWrapper {
 
     spotOutput
   }
-  /**
-    * Spot LDA Overall Wrapper
-    * Wraps SpotSparkLDAWrapper and SpotLDACWrapper so that there can be a single interface for flow, dns, and proxy
-    * 1. SpotLDAWrapper input and output have the same components as SpotLDACWrapper and SpotSparkWrapper
-    * 2. Determines which version of LDA (LDAC or Spark) to call based on the input parameter, ldaImplemention
-    * 3. Converts SpotLDAWrapper input into correct version and calls appropriate version of runLDA
-    * 4. Converts output to generic SpotLDAOutput for further processing
-    */
 
 }
 

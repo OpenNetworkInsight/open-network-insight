@@ -46,8 +46,7 @@ class DNSSuspiciousConnectsModel(inTopicCount: Int,
                                  inFrameLengthCuts: Array[Double],
                                  inSubdomainLengthCuts: Array[Double],
                                  inNumberPeriodsCuts: Array[Double],
-                                 inEntropyCuts: Array[Double],
-                                 inLdaDistributor: String ) {
+                                 inEntropyCuts: Array[Double]) {
 
   val topicCount = inTopicCount
   val ipToTopicMix = inIpToTopicMix
@@ -57,7 +56,6 @@ class DNSSuspiciousConnectsModel(inTopicCount: Int,
   val subdomainLengthCuts = inSubdomainLengthCuts
   val numberPeriodsCuts = inNumberPeriodsCuts
   val entropyCuts = inEntropyCuts
-  val ldaDistributor = inLdaDistributor
   /**
     * Use a suspicious connects model to assign estimated probabilities to a dataframe of
     * DNS log events.
@@ -146,8 +144,7 @@ object DNSSuspiciousConnectsModel {
                     logger: Logger,
                     config: SuspiciousConnectsConfig,
                     inDF: DataFrame,
-                    topicCount: Int,
-                    ldaDistributor: String = "mpi" ): DNSSuspiciousConnectsModel = {
+                    topicCount: Int): DNSSuspiciousConnectsModel = {
 
     logger.info("Training DNS suspicious connects model from " + config.inputPath)
 
@@ -221,8 +218,7 @@ object DNSSuspiciousConnectsModel {
       frameLengthCuts,
       subdomainLengthCuts,
       numberPeriodsCuts,
-      entropyCuts,
-      ldaDistributor )
+      entropyCuts )
 
   }
 
