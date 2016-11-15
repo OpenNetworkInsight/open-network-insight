@@ -25,7 +25,7 @@ function buildTooltip (d, input, output) {
         toInfo += `<li>${numberFormat(bytes)} bytes to ${this.state.data.map[i]}</li>`
     });
 
-    tooltip += '<div style="max-height: 100px; overflow-y: scroll;">'
+    tooltip += '<div style="max-height: 100px; overflow-y: auto;">'
     fromInfo.length && (tooltip+= `<h5><strong>In</strong></h5><ul>${fromInfo}</ul>`);
     toInfo.length && (tooltip+= `<h5><strong>Out</strong></h5><ul>${toInfo}</ul>`);
     tooltip += '</div>';
