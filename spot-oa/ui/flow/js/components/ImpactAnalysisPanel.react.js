@@ -29,7 +29,14 @@ function buildGraph(root, ipsrc)
         .append("svg:g")
         .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
 
-    $('svg', ReactDOM.findDOMNode(this)).off('parentUpdate').on('parentUpdate', () => buildGraph.call(this, root, ipsrc));
+    function resizeHandler() {
+        buildGraph.call(this, root, ipsrc);
+    }
+
+    window.removeEventListener('resize', resizeHandler.bind(this));
+    window.addEventListener('resize', resizeHandler.bind(this));
+
+    $('svg', ReactDOM.findDOMNode(this)).off('parentUpdate').on('parentUpdate', resizeHandler.bind(this));
 
     svg.append("svg:rect")
         .attr("class", "background")

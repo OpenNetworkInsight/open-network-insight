@@ -53,7 +53,13 @@ function buildGraph(root, ipsrc) {
         .attr("height", height)
         .on("mousedown", mousedown);
 
-    $('svg', ReactDOM.findDOMNode(this)).off('parentUpdate').on('parentUpdate', () => buildGraph.call(this, root, ipsrc));
+    function resizeHandler() {
+        buildGraph.call(this, root, ipsrc);
+    }
+
+    window.removeEventListener('resize', resizeHandler.bind(this));
+    window.addEventListener('resize', resizeHandler.bind(this));
+    $('svg', ReactDOM.findDOMNode(this)).off('parentUpdate').on('parentUpdate', resizeHandler.bind(this));
 
     queue()
         .defer(d3.json, "../flow/world-110m.json")
