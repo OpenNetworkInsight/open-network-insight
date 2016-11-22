@@ -286,25 +286,23 @@ var GlobeViewPanel = React.createClass({
     },
     _onChange: function ()
     {
-        var state, filterName, root;
+        const storeData = GlobeViewStore.getData();
 
-        state = GlobeViewStore.getData();
-
-        root = {
-            name: GlobeViewStore.getFilterValue(),
-            children: []
+        const state ={
+            loading: storeData.loading
         };
 
-        if (!state.loading)
-        {
-            filterName = GlobeViewStore.getFilterName();
-            root.children = state.data;
+        if (storeData.error) {
+            state.error = storeData.error;
+        }
+        else if(!storeData.loading && storeData.data) {
+            state.root = {
+                name: GlobeViewStore.getIp(),
+                children: storeData.data
+            };
         }
 
-        state.root = root;
-        delete state.data;
-
-        this.setState(state);
+        this.replaceState(state);
     },
     getInitialState: function ()
     {
@@ -342,8 +340,12 @@ var GlobeViewPanel = React.createClass({
     {
         if (!this.state.loading && !this.state.error)
         {
-
-          buildGraph.call(this, this.state.root);
+            if (this.state.root) {
+                buildGraph.call(this, this.state.root);
+            }
+            else {
+                d3.select(ReactDOM.findDOMNode(this)).selectAll('*').remove();
+            }
         }
     }
 });
