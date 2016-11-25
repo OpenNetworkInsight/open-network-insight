@@ -21,7 +21,7 @@ const ImpactAnalysisPanel = React.createClass({
             .attr('width', '100%')
             .attr('height', '100%')
             .on('click', () => {
-                this.drawBars(this.state.data.root);
+                this.drawBars(this.state.data);
             });
 
         this.canvas = svgSel.append('g');
@@ -33,10 +33,10 @@ const ImpactAnalysisPanel = React.createClass({
         // Layout our data
         d3.layout.partition()
             .value(d => d.size)
-            .nodes(this.state.data.root);
+            .nodes(this.state.data);
 
         // Create scales
-        this.xScale = d3.scale.linear().domain([0, this.state.data.root.value]).nice();
+        this.xScale = d3.scale.linear().domain([0, this.state.data.value]).nice();
         this.colorScale = d3.scale.ordinal().range(['#0071c5', '#939598']); // bar color
 
         this.xAxis = d3.svg.axis().scale(this.xScale).orient('top');
@@ -53,7 +53,7 @@ const ImpactAnalysisPanel = React.createClass({
 
         this.canvas.attr('transform', `translate(${m[3]},${m[0]})`);
 
-        this.drawBars(this.state.data.root);
+        this.drawBars(this.state.data);
     },
     drawBars(root) {
         const duration = d3.event && d3.event.altKey ? 7500 : 750;
@@ -118,32 +118,27 @@ const ImpactAnalysisPanel = React.createClass({
     {
         const storeData = ImpactAnalysisStore.getData();
 
-        if (storeData.loading || storeData.error) {
-            this.replaceState(storeData);
+        const state = {loading: storeData.loading};
+
+        if (storeData.error) {
+            state.error = storeData.error;
         }
-        else {
-            const root = {
-                name: ImpactAnalysisStore.getFilterValue(),
-                size: 0,
-                children: []
+        else if(!storeData.loading && storeData.data) {
+            state.data = {
+                name: ImpactAnalysisStore.getIp(),
+                size: storeData.data.children.length
             };
 
-            storeData.data.children.forEach(function (item)
-            {
-                root.children.push({
+            state.data.children = storeData.data.children.map((item) => {
+                return {
                     name: item.name,
                     size: item.size,
                     children: item.children
-                });
-            });
-
-            this.replaceState({
-                data: {
-                    root,
-                    value: storeData.value
-                }
+                };
             });
         }
+
+        this.replaceState(state);
     }
 });
 
