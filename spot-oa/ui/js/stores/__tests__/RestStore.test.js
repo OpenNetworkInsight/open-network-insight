@@ -1,11 +1,9 @@
-jest.mock('jquery');
-
-const RestStore = require('../RestStore');
+const Store = require('../RestStore');
 
 test('Create instance. Empty data', () => {
-    const instance = new RestStore('/my-endpoint.csv');
+    const instance = new Store('/my-endpoint');
 
-    expect(instance.endpoint).toBe('/my-endpoint.csv');
+    expect(instance.endpoint).toBe('/my-endpoint');
 
     const storeState = instance.getData();
     expect(storeState).toBeInstanceOf(Object);
@@ -22,11 +20,11 @@ test('Create instance. Empty data', () => {
 });
 
 test('Create instance. Default to loading', () => {
-    const instance = new RestStore('/my-endpoint.csv', {
+    const instance = new Store('/my-endpoint', {
         loading: true
     });
 
-    expect(instance.endpoint).toBe('/my-endpoint.csv');
+    expect(instance.endpoint).toBe('/my-endpoint');
 
     const storeState = instance.getData();
     expect(storeState).toBeInstanceOf(Object);
@@ -38,12 +36,12 @@ test('Create instance. Default to loading', () => {
 });
 
 test('Create instance. Default to known data', () => {
-    const instance = new RestStore('/my-endpoint.csv', {
+    const instance = new Store('/my-endpoint', {
         headers: ['First', 'Second', 'Third'],
         data: [1 ,2, 3]
     });
 
-    expect(instance.endpoint).toBe('/my-endpoint.csv');
+    expect(instance.endpoint).toBe('/my-endpoint');
 
     const storeState = instance.getData();
     expect(storeState).toBeInstanceOf(Object);
@@ -55,7 +53,7 @@ test('Create instance. Default to known data', () => {
 });
 
 test('Filters', () => {
-    const instance = new RestStore('/my-endpoint.csv');
+    const instance = new Store('/my-endpoint');
 
     instance.setRestFilter('foo', 'bar');
 
@@ -67,7 +65,7 @@ test('Filters', () => {
 });
 
 test('Endpoint', () => {
-    const instance = new RestStore('/my-endpoint.csv');
+    const instance = new Store('/my-endpoint');
 
     instance.setEndpoint('/new-endpoint.json');
 
@@ -75,7 +73,7 @@ test('Endpoint', () => {
 });
 
 test('Data', () => {
-    const instance = new RestStore('/my-endpoint.csv');
+    const instance = new Store('/my-endpoint');
 
     instance.setData({
         loading: true,
@@ -103,7 +101,7 @@ test('Data', () => {
 });
 
 test('Data listeners', () => {
-    const instance = new RestStore('/my-endpoint.csv');
+    const instance = new Store('/my-endpoint');
 
     const handler = jest.fn();
 
@@ -121,10 +119,11 @@ test('Data listeners', () => {
     expect(handler).toHaveBeenCalledTimes(2);
 });
 
+jest.mock('jquery');
 const $ = require('jquery');
 
 test('Reload data (Success)', () => {
-    const instance = new RestStore('/${date}/my-endpoint-${id}-${time}.csv');
+    const instance = new Store('/${date}/my-endpoint-${id}-${time}');
 
     const handler = jest.fn();
 
@@ -144,7 +143,7 @@ test('Reload data (Success)', () => {
     expect(handler).toHaveBeenCalledTimes(2);
 
     // Make sure server request is being made correctly
-    expect($.ajax.mock.calls[0][0]).toBe('/20161004/my-endpoint-UUID-22_00.csv');
+    expect($.ajax.mock.calls[0][0]).toBe('/20161004/my-endpoint-UUID-22_00');
     const reqParams = $.ajax.mock.calls[0][1];
     expect(reqParams.method).toBe('GET');
     expect(reqParams.context).toBe(instance);
@@ -174,7 +173,7 @@ test('Reload data (Success)', () => {
 });
 
 test('Reload data (Error)', () => {
-    const instance = new RestStore('/${date}/my-endpoint-${id}-${time}.csv');
+    const instance = new Store('/${date}/my-endpoint-${id}-${time}');
 
     const handler = jest.fn();
 
@@ -201,7 +200,7 @@ test('Reload data (Error)', () => {
 });
 
 test('Reload data (Custom Error)', () => {
-    const instance = new RestStore('/${date}/my-endpoint-${id}-${time}.csv');
+    const instance = new Store('/${date}/my-endpoint-${id}-${time}');
 
     const customError = 'No data has been found';
     instance.errorMessages['404'] = customError;
@@ -220,7 +219,7 @@ test('Reload data (Custom Error)', () => {
 });
 
 test('Reload data (Loading notification)', () => {
-    const instance = new RestStore('/${date}/my-endpoint-${id}-${time}.csv');
+    const instance = new Store('/${date}/my-endpoint-${id}-${time}');
 
     instance.setData = jest.fn();
 
@@ -233,4 +232,44 @@ test('Reload data (Loading notification)', () => {
 
     expect(instance.setData).toHaveBeenCalledTimes(2);
     expect(instance.setData.mock.calls[0][0].loading).toBe(true);
+});
+
+const d3 = require('d3');
+
+test('Custom parser', () => {
+    const instance = new Store('/custom-parser-endpoint');
+    instance._parser = d3.dsv('|', 'text/plain');
+
+    const handler = jest.fn();
+
+    const okResponse = 'header1|header2|header3\ndata1-1|data1-2|data1-3\ndata2-1|data2-2|data2-3';
+    $.ajax = jest.fn((url, options) => {
+        options.success.call(options.context, okResponse);
+    });
+
+    instance.reload();
+
+    expect($.ajax).toHaveBeenCalled();
+
+    // Testing server response
+    const dataFromServer = instance.getData();
+
+    expect(dataFromServer.loading).toBe(false);
+
+    expect(dataFromServer.headers).toBeInstanceOf(Object);
+    expect(Object.keys(dataFromServer.headers).length).toBe(3);
+    expect(dataFromServer.headers.header1).toBe('header1');
+    expect(dataFromServer.headers.header2).toBe('header2');
+    expect(dataFromServer.headers.header3).toBe('header3');
+
+    expect(dataFromServer.data).toBeInstanceOf(Array);
+    expect(dataFromServer.data.length).toBe(2);
+
+    expect(dataFromServer.data[0].header1).toBe('data1-1');
+    expect(dataFromServer.data[0].header2).toBe('data1-2');
+    expect(dataFromServer.data[0].header3).toBe('data1-3');
+
+    expect(dataFromServer.data[1].header1).toBe('data2-1');
+    expect(dataFromServer.data[1].header2).toBe('data2-2');
+    expect(dataFromServer.data[1].header3).toBe('data2-3');
 });
