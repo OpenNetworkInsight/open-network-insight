@@ -1,3 +1,6 @@
+jest.mock('jquery');
+const $ = require('jquery');
+
 const Store = require('../RestStore');
 
 test('Create instance. Empty data', () => {
@@ -8,10 +11,8 @@ test('Create instance. Empty data', () => {
     const storeState = instance.getData();
     expect(storeState).toBeInstanceOf(Object);
     expect(storeState.loading).toBe(false);
-    expect(storeState.headers).toBeInstanceOf(Object);
-    expect(Object.keys(storeState.headers).length).toBe(0);
-    expect(storeState.data).toBeInstanceOf(Array);
-    expect(storeState.data.length).toBe(0);
+    expect(storeState.headers).toBeUndefined();
+    expect(storeState.data).toBeUndefined();
     expect(instance.defaultErrorMessage).toBe('Oops, something went wrong!!');
     expect(instance.errorMessages).toBeInstanceOf(Object);
     expect(Object.keys(instance.errorMessages).length).toBe(0);
@@ -29,10 +30,8 @@ test('Create instance. Default to loading', () => {
     const storeState = instance.getData();
     expect(storeState).toBeInstanceOf(Object);
     expect(storeState.loading).toBe(true);
-    expect(storeState.headers).toBeInstanceOf(Object);
-    expect(Object.keys(storeState.headers).length).toBe(0);
-    expect(storeState.data).toBeInstanceOf(Array);
-    expect(storeState.data.length).toBe(0);
+    expect(storeState.headers).toBeUndefined();
+    expect(storeState.data).toBeUndefined();
 });
 
 test('Create instance. Default to known data', () => {
@@ -96,8 +95,8 @@ test('Data', () => {
 
     storeState = instance.getData();
     expect(storeState.loading).toBe(false);
-    expect(Object.keys(storeState.headers).length).toBe(0);
-    expect(storeState.data.length).toBe(0);
+    expect(storeState.headers).toBeUndefined();
+    expect(storeState.data).toBeUndefined();
 });
 
 test('Data listeners', () => {
@@ -118,9 +117,6 @@ test('Data listeners', () => {
     instance.setData('More data');
     expect(handler).toHaveBeenCalledTimes(2);
 });
-
-jest.mock('jquery');
-const $ = require('jquery');
 
 test('Reload data (Success)', () => {
     const instance = new Store('/${date}/my-endpoint-${id}-${time}');
@@ -192,10 +188,8 @@ test('Reload data (Error)', () => {
     const errorFromServer = instance.getData();
 
     expect(errorFromServer.loading).toBe(false);
-    expect(errorFromServer.headers).toBeInstanceOf(Object);
-    expect(Object.keys(errorFromServer.headers).length).toBe(0);
-    expect(errorFromServer.data).toBeInstanceOf(Array);
-    expect(errorFromServer.data.length).toBe(0);
+    expect(errorFromServer.headers).toBeUndefined();
+    expect(errorFromServer.data).toBeUndefined();
     expect(errorFromServer.error).toBe(instance.defaultErrorMessage);
 });
 

@@ -1,7 +1,7 @@
-const Store = require('../JsonStore');
-
 jest.mock('jquery');
 const $ = require('jquery');
+
+const Store = require('../JsonStore');
 
 test('Reload data (Success)', () => {
     const instance = new Store('/${date}/my-endpoint-${id}-${time}');
@@ -77,8 +77,8 @@ test('Reload data (Error)', () => {
     const errorFromServer = instance.getData();
 
     expect(errorFromServer).toBeInstanceOf(Object);
-    expect(Object.keys(errorFromServer).length).toBe(1);
-    expect(errorFromServer.loading).toBeUndefined();
+    expect(Object.keys(errorFromServer).length).toBe(2);
+    expect(errorFromServer.loading).toBe(false);
     expect(errorFromServer.headers).toBeUndefined();
     expect(errorFromServer.data).toBeUndefined();
     expect(errorFromServer.error).toBe(instance.defaultErrorMessage);
