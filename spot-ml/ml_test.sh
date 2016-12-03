@@ -37,7 +37,6 @@ HDFS_MODEL=${HPATH}/model
 LDA_OUTPUT_DIR=test/${DSOURCE}
 
 TOPIC_COUNT=20
-LDA_IMP="SparkLDA"
 
 nodes=${NODES[0]}
 for n in "${NODES[@]:1}" ; do nodes+=",${n}"; done
@@ -49,13 +48,6 @@ mkdir -p ${LPATH}
 rm -f ${LPATH}/*.{dat,beta,gamma,other,pkl} # protect the flow_scores.csv file
 
 hdfs dfs -rm -R -f ${HDFS_SCORED_CONNECTS}
-
-# Add -p <command> to execute pre MPI command.
-# Pre MPI command can be configured in /etc/spot.conf
-# In this script, after the line after --mpicmd ${MPI_CMD} add:
-# --mpiprep ${MPI_PREP_CMD}
-
-${MPI_PREP_CMD}
 
 time spark-submit --class "org.apache.spot.SuspiciousConnects" \
   --master yarn-client \
@@ -79,21 +71,10 @@ time spark-submit --class "org.apache.spot.SuspiciousConnects" \
   --input ${RAWDATA_PATH}  \
   --dupfactor ${DUPFACTOR} \
   --feedback ${FEEDBACK_PATH} \
-  --model ${LPATH}/model.dat \
-  --topicdoc ${LPATH}/final.gamma \
-  --topicword ${LPATH}/final.beta \
-  --lpath ${LPATH} \
-  --ldapath ${LDAPATH} \
-  --luser ${LUSER} \
-  --mpicmd ${MPI_CMD}  \
-  --proccount ${PROCESS_COUNT} \
   --topiccount ${TOPIC_COUNT} \
-  --nodes ${nodes} \
   --scored ${HDFS_SCORED_CONNECTS} \
-  --tempmodel ${HDFS_MODEL} \
   --threshold ${TOL} \
   --maxresults ${MAXRESULTS} \
-  --ldaImplementation ${LDA_IMP} \
   --ldaMaxIterations 11
 
 cd ${LPATH}

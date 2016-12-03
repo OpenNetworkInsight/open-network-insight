@@ -13,7 +13,6 @@ import org.apache.spot.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.apache.spot.proxy.ProxySchema._
 import org.apache.spot.utilities._
 import org.apache.spot.SuspiciousConnectsScoreFunction
-import org.apache.spot.spotldacwrapper.SpotLDACWrapper
 
 /**
   * Encapsulation of a proxy suspicious connections model.
@@ -87,7 +86,7 @@ object ProxySuspiciousConnectsModel {
     * @param sqlContext   SQL context.
     * @param logger       Logge object.
     * @param config       SuspiciousConnetsArgumnetParser.Config object containg CLI arguments.
-    * @param inDF           Dataframe for training data, with columns Host, Time, ReqMethod, FullURI, ResponseContentType,
+    * @param inDF         Dataframe for training data, with columns Host, Time, ReqMethod, FullURI, ResponseContentType,
     *                     UserAgent, RespCode (as defined in ProxySchema object).
     * @return ProxySuspiciousConnectsModel
     */
@@ -99,9 +98,9 @@ object ProxySuspiciousConnectsModel {
 
     logger.info("training new proxy suspcious connects model")
 
-    
+
     val df = inDF.select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
-      .unionAll(ProxyFeedback.loadFeedbackDF(sparkContext, sqlContext, config.scoresFile, config.duplicationFactor))
+      .unionAll(ProxyFeedback.loadFeedbackDF(sparkContext, sqlContext, config.feedbackFile, config.duplicationFactor))
 
     val timeCuts =
       Quantiles.computeDeciles(df.select(Time).rdd.map({ case Row(t: String) => TimeUtilities.getTimeAsDouble(t) }))
@@ -118,35 +117,24 @@ object ProxySuspiciousConnectsModel {
       Quantiles.computeQuintiles(df.select(UserAgent).rdd.map({ case Row(agent: String) => agentToCountBC.value(agent) }))
 
     val docWordCount: RDD[SpotLDAInput] =
-      getIPWordCounts(sparkContext, sqlContext, logger, df, config.scoresFile, config.duplicationFactor, agentToCount, timeCuts, entropyCuts, agentCuts)
+      getIPWordCounts(sparkContext, sqlContext, logger, df, config.feedbackFile, config.duplicationFactor, agentToCount, timeCuts, entropyCuts, agentCuts)
 
 
-    val SpotLDAOutput(ipToTopicMixDF, wordResults) = SpotLDAWrapper.runLDA(sparkContext, sqlContext,docWordCount,
-      config.modelFile,
-      config.hdfsModelFile,
-      config.topicDocumentFile,
-      config.topicWordFile,
-      config.mpiPreparationCmd,
-      config.mpiCmd,
-      config.mpiProcessCount,
+    val SpotLDAOutput(ipToTopicMixDF, wordResults) = SpotLDAWrapper.runLDA(sparkContext,
+      sqlContext,
+      docWordCount,
       config.topicCount,
-      config.localPath,
-      config.ldaPath,
-      config.localUser,
-      config.analysis,
-      config.nodes,
-      config.ldaImplementation,
       logger,
-      1.02,
-      1.001,
-      config.ldaMaxIterations,
-      Some(0xdeadbeef))
+      config.ldaPRGSeed,
+      config.ldaAlpha,
+      config.ldaBeta,
+      config.ldaMaxIterations)
 
 
     // Since Proxy is still broadcasting ip to topic mix, we need to convert data frame to Map[String, Array[Double]]
     val ipToTopicMix = ipToTopicMixDF
       .rdd
-      .map({ case (ipToTopicMixRow: Row) => (ipToTopicMixRow.toSeq.toArray) })
+      .map({ case (ipToTopicMixRow: Row) => ipToTopicMixRow.toSeq.toArray })
       .map({
         case (ipToTopicMixSeq) => (ipToTopicMixSeq(0).asInstanceOf[String], ipToTopicMixSeq(1).asInstanceOf[Seq[Double]]
           .toArray)

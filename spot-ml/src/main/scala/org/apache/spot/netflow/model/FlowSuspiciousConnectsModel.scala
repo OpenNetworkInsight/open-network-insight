@@ -2,20 +2,17 @@ package org.apache.spot.netflow.model
 
 import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
+import org.apache.spark.sql.WideUDFs.udf
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SQLContext, WideUDFs}
-
-import org.apache.spot.SpotLDAWrapper
 import org.apache.spot.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
-
+import org.apache.spot.SpotLDAWrapperSchema._
 import org.apache.spot.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.apache.spot.netflow.FlowSchema._
 import org.apache.spot.netflow.FlowWordCreator
 import org.apache.spot.utilities.Quantiles
-import WideUDFs.udf
-import org.apache.spot.spotldacwrapper.SpotLDACWrapper
-import org.apache.spot.spotldacwrapper.SpotLDACSchema._
+import org.apache.spot.{SpotLDAWrapper, SpotLDAWrapperSchema}
 
 /**
   * A probabilistic model of the netflow traffic observed in a network.
@@ -142,7 +139,7 @@ object FlowSuspiciousConnectsModel {
 
     val totalDataDF = selectedDF.unionAll(FlowFeedback.loadFeedbackDF(sparkContext,
       sqlContext,
-      config.scoresFile,
+      config.feedbackFile,
       config.duplicationFactor))
 
 
@@ -200,26 +197,15 @@ object FlowSuspiciousConnectsModel {
         .map({ case ((ip, word), count) => SpotLDAInput(ip, word, count) })
 
 
-    val SpotLDAOutput(ipToTopicMixDF, wordToPerTopicProb) = SpotLDAWrapper.runLDA(sparkContext, sqlContext, ipWordCounts,
-      config.modelFile,
-      config.hdfsModelFile,
-      config.topicDocumentFile,
-      config.topicWordFile,
-      config.mpiPreparationCmd,
-      config.mpiCmd,
-      config.mpiProcessCount,
+    val SpotLDAOutput(ipToTopicMixDF, wordToPerTopicProb) = SpotLDAWrapper.runLDA(sparkContext,
+      sqlContext,
+      ipWordCounts,
       config.topicCount,
-      config.localPath,
-      config.ldaPath,
-      config.localUser,
-      config.analysis,
-      config.nodes,
-      config.ldaImplementation,
       logger,
-      1.02,
-      1.001,
-      config.ldaMaxIterations,
-      Some(0xdeadbeef))
+      config.ldaPRGSeed,
+      config.ldaAlpha,
+      config.ldaBeta,
+      config.ldaMaxIterations)
 
     new FlowSuspiciousConnectsModel(topicCount,
       ipToTopicMixDF,

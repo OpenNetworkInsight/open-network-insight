@@ -1,9 +1,7 @@
-package org.apache.spot.spotldacwrapper
+package org.apache.spot
 
-/**
-  * Created by rabarona on 11/14/16.
-  */
-object SpotLDACSchema {
+
+object SpotLDAWrapperSchema {
 
   // modelDF columns
   val DocumentName = "document_name"
