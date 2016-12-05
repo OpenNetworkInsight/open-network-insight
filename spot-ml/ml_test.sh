@@ -71,11 +71,11 @@ time spark-submit --class "org.apache.spot.SuspiciousConnects" \
   --input ${RAWDATA_PATH}  \
   --dupfactor ${DUPFACTOR} \
   --feedback ${FEEDBACK_PATH} \
-  --topiccount ${TOPIC_COUNT} \
+  --ldatopiccount ${TOPIC_COUNT} \
   --scored ${HDFS_SCORED_CONNECTS} \
   --threshold ${TOL} \
   --maxresults ${MAXRESULTS} \
-  --ldaMaxIterations 11
+  --ldamaxiterations 11
 
 cd ${LPATH}
 hadoop fs -getmerge ${HDFS_SCORED_CONNECTS}/part-* ${DSOURCE}_results.csv && hadoop fs -moveFromLocal \

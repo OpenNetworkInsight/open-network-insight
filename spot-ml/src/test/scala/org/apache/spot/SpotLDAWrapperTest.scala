@@ -4,14 +4,19 @@ import org.apache.log4j.{Level, LogManager}
 import org.apache.spark.mllib.linalg.{Matrices, Vector, Vectors}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SQLContext}
-import org.apache.spot.SpotLDAWrapper.{SpotLDAInput, formatSparkLDADocTopicOutput, formatSparkLDAWordOutput}
-import org.apache.spot.SpotLDAWrapperSchema._
+import org.apache.spot.lda.SpotLDAWrapperSchema._
+import org.apache.spot.lda.SpotLDAWrapper
+import org.apache.spot.lda.SpotLDAWrapper._
 import org.apache.spot.testutils.TestingSparkContextFlatSpec
 import org.scalatest.Matchers
 
 import scala.collection.immutable.Map
 
 class SpotLDAWrapperTest extends TestingSparkContextFlatSpec with Matchers {
+
+  val ldaAlpha = 1.02
+  val ldaBeta = 1.001
+  val ldaMaxiterations = 20
 
   "SparkLDA" should "handle an extremely unbalanced two word doc" in {
     val logger = LogManager.getLogger("SuspiciousConnectsAnalysis")
@@ -22,7 +27,7 @@ class SpotLDAWrapperTest extends TestingSparkContextFlatSpec with Matchers {
     val dogWorld = SpotLDAInput("pets", "dog", 999)
 
     val data = sparkContext.parallelize(Seq(catFancy, dogWorld))
-    val out = SpotLDAWrapper.runLDA(sparkContext, testSqlContext, data, 2, logger, Some(0xdeadbeef))
+    val out = SpotLDAWrapper.runLDA(sparkContext, testSqlContext, data, 2, logger, Some(0xdeadbeef), ldaAlpha, ldaBeta, ldaMaxiterations)
 
     val topicMixDF = out.docToTopicMix
 
@@ -44,7 +49,7 @@ class SpotLDAWrapperTest extends TestingSparkContextFlatSpec with Matchers {
     val dogWorld = SpotLDAInput("dog world", "dog", 1)
 
     val data = sparkContext.parallelize(Seq(catFancy, dogWorld))
-    val out = SpotLDAWrapper.runLDA(sparkContext, testSqlContext, data, 2, logger, None)
+    val out = SpotLDAWrapper.runLDA(sparkContext, testSqlContext, data, 2, logger, Some(0xdeadbeef), ldaAlpha, ldaBeta, ldaMaxiterations)
 
     val topicMixDF = out.docToTopicMix
     var dogTopicMix: Array[Double] =

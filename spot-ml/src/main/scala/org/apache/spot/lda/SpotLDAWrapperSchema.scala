@@ -1,5 +1,4 @@
-package org.apache.spot
-
+package org.apache.spot.lda
 
 object SpotLDAWrapperSchema {
 

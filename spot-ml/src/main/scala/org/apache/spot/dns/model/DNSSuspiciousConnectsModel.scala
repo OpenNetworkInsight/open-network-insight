@@ -7,11 +7,11 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.apache.spot.SpotLDAWrapper
-import org.apache.spot.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
 import org.apache.spot.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.apache.spot.dns.DNSSchema._
 import org.apache.spot.dns.DNSWordCreation
+import org.apache.spot.lda.SpotLDAWrapper
+import org.apache.spot.lda.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
 import org.apache.spot.utilities.DomainProcessor.DomainInfo
 import org.apache.spot.utilities.{CountryCodes, DomainProcessor, Quantiles, TopDomains}
 
@@ -199,7 +199,7 @@ object DNSSuspiciousConnectsModel {
       config.ldaPRGSeed,
       config.ldaAlpha,
       config.ldaBeta,
-      config.ldaMaxIterations)
+      config.ldaMaxiterations)
 
     // Since DNS is still broadcasting ip to topic mix, we need to convert data frame to Map[String, Array[Double]]
     val ipToTopicMix = ipToTopicMixDF

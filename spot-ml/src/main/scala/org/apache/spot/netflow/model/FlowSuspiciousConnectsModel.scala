@@ -5,14 +5,14 @@ import org.apache.spark.SparkContext
 import org.apache.spark.sql.WideUDFs.udf
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, Row, SQLContext, WideUDFs}
-import org.apache.spot.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
-import org.apache.spot.SpotLDAWrapperSchema._
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spot.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
+import org.apache.spot.lda.SpotLDAWrapper
+import org.apache.spot.lda.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
+import org.apache.spot.lda.SpotLDAWrapperSchema._
 import org.apache.spot.netflow.FlowSchema._
 import org.apache.spot.netflow.FlowWordCreator
 import org.apache.spot.utilities.Quantiles
-import org.apache.spot.{SpotLDAWrapper, SpotLDAWrapperSchema}
 
 /**
   * A probabilistic model of the netflow traffic observed in a network.
@@ -205,7 +205,7 @@ object FlowSuspiciousConnectsModel {
       config.ldaPRGSeed,
       config.ldaAlpha,
       config.ldaBeta,
-      config.ldaMaxIterations)
+      config.ldaMaxiterations)
 
     new FlowSuspiciousConnectsModel(topicCount,
       ipToTopicMixDF,

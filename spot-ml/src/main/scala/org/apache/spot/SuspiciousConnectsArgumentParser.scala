@@ -16,7 +16,7 @@ object SuspiciousConnectsArgumentParser {
                                       maxResults: Int = -1,
                                       outputDelimiter: String = "\t",
                                       ldaPRGSeed: Option[Long] = None,
-                                      ldaMaxIterations: Int = 20,
+                                      ldaMaxiterations: Int = 20,
                                       ldaAlpha: Double = 1.02,
                                       ldaBeta: Double = 1.001)
 
@@ -41,7 +41,7 @@ object SuspiciousConnectsArgumentParser {
       text("duplication factor controlling how to downgrade non-threatening connects from the feedback file")
 
 
-    opt[String]("topiccount").required().valueName("number of topics in topic model").
+    opt[String]("ldatopiccount").required().valueName("number of topics in topic model").
       action((x, c) => c.copy(topicCount = x.toInt)).
       text("topic count")
 
@@ -65,16 +65,16 @@ object SuspiciousConnectsArgumentParser {
       action((x, c) => c.copy(ldaPRGSeed = Some(x.toLong))).
       text("seed for the pseudorandom generator")
 
-    opt[Int]("ldaMaxIterations").optional().valueName("int").
-      action((x, c) => c.copy(ldaMaxIterations = x)).
+    opt[Int]("ldamaxiterations").optional().valueName("int").
+      action((x, c) => c.copy(ldaMaxiterations = x)).
       text("maximum number of iterations used in LDA")
 
 
-    opt[Double]("ldaAlpha").optional().valueName("float64").
+    opt[Double]("ldaalpha").optional().valueName("float64").
       action((x, c) => c.copy(ldaAlpha = x)).
       text("document concentration for lda, default 1.02")
 
-    opt[Double]("ldaBeta").optional().valueName("float64").
+    opt[Double]("ldabeta").optional().valueName("float64").
       action((x, c) => c.copy(ldaBeta = x)).
       text("topic concentration for lda, default 1.001")
   }

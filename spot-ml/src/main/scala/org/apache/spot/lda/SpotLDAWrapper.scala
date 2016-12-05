@@ -1,4 +1,4 @@
-package org.apache.spot
+package org.apache.spot.lda
 
 import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
@@ -7,7 +7,8 @@ import org.apache.spark.mllib.linalg.{Matrix, Vector, Vectors}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-import org.apache.spot.SpotLDAWrapperSchema._
+
+import SpotLDAWrapperSchema._
 
 import scala.collection.immutable.Map
 
@@ -33,9 +34,9 @@ object SpotLDAWrapper {
              topicCount: Int,
              logger: Logger,
              ldaSeed: Option[Long],
-             ldaAlpha: Double = 1.02,
-             ldaBeta: Double = 1.001,
-             maxIterations: Int = 20): SpotLDAOutput = {
+             ldaAlpha: Double,
+             ldaBeta: Double,
+             maxIterations: Int): SpotLDAOutput = {
 
     import sqlContext.implicits._
 
@@ -87,10 +88,12 @@ object SpotLDAWrapper {
         .setBeta(ldaBeta)
         .setOptimizer(optimizer)
 
-    //If seed not set, the automatically set to hash value of class name
-    def unrollSeed(opt: Option[Long]): Long = opt getOrElse -1L
-    val ldaSeedLong = unrollSeed(ldaSeed)
-    if (ldaSeedLong != -1) lda.setSeed(ldaSeedLong)
+    // If caller does not provide seed to lda, ie. ldaSeed is empty, lda is seeded automatically set to hash value of class name
+
+    if (ldaSeed.nonEmpty) {
+      lda.setSeed(ldaSeed.get)
+    }
+
 
     //Create LDA model
     val ldaModel = lda.run(ldaCorpus)

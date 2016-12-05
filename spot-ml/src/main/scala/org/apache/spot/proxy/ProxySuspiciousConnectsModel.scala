@@ -6,14 +6,12 @@ import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
-
-import org.apache.spot.SpotLDAWrapper
-import org.apache.spot.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
 import org.apache.spot.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.apache.spot.proxy.ProxySchema._
 import org.apache.spot.utilities._
 import org.apache.spot.SuspiciousConnectsScoreFunction
-
+import org.apache.spot.lda.SpotLDAWrapper
+import org.apache.spot.lda.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
 /**
   * Encapsulation of a proxy suspicious connections model.
   *
@@ -128,7 +126,7 @@ object ProxySuspiciousConnectsModel {
       config.ldaPRGSeed,
       config.ldaAlpha,
       config.ldaBeta,
-      config.ldaMaxIterations)
+      config.ldaMaxiterations)
 
 
     // Since Proxy is still broadcasting ip to topic mix, we need to convert data frame to Map[String, Array[Double]]
