@@ -19,6 +19,7 @@ object SuspiciousConnectsArgumentParser {
                                       topicCount: Int = 20,
                                       localPath: String = "",
                                       localUser: String = "",
+                                      userDomain: String = "",
                                       ldaPath: String = "",
                                       nodes: String = "",
                                       hdfsScoredConnect: String = "",
@@ -87,6 +88,10 @@ object SuspiciousConnectsArgumentParser {
     opt[String]("luser").required().valueName("<local path>").
       action((x, c) => c.copy(localUser = x)).
       text("Local user path")
+
+    opt[String]("userDomain").required().valueName("<user domain>").
+      action((x, c) => c.copy(userDomain = x)).
+      text("Domain of spot user (example: intel)")
 
     opt[String]("nodes").required().valueName("<input param>").
       action((x, c) => c.copy(nodes = x)).
