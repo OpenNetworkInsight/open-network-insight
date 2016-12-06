@@ -108,8 +108,8 @@ time spark-submit --class "org.apache.spot.SuspiciousConnects" \
   --topicword ${LPATH}/final.beta \
   --lpath ${LPATH} \
   --ldapath ${LDAPATH} \
-  --luser ${LUSER} \ 
-  --userdomain ${USER_DOMAIN}\
+  --luser ${LUSER} \
+  --userdomain ${USER_DOMAIN} \
   --mpicmd ${MPI_CMD}  \
   --proccount ${PROCESS_COUNT} \
   --topiccount ${TOPIC_COUNT} \
