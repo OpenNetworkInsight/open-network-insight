@@ -78,6 +78,7 @@ time spark-submit --class "org.apache.spot.SuspiciousConnects" \
   --dupfactor ${DUPFACTOR} \
   --feedback ${FEEDBACK_PATH} \
   --ldatopiccount ${TOPIC_COUNT} \
+  --userdomain ${USER_DOMAIN}\
   --scored ${HDFS_SCORED_CONNECTS} \
   --threshold ${TOL} \
   --maxresults ${MAXRESULTS} \

@@ -45,7 +45,7 @@ object DNSSuspiciousConnectsAnalysis {
       DNSSuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, cleanDataDF, config.topicCount)
 
     logger.info("Scoring")
-    val scoredDF = model.score(sparkContext, sqlContext, cleanDataDF)
+    val scoredDF = model.score(sparkContext, sqlContext, cleanDataDF, userDomain)
 
     val filteredDF = scoredDF.filter(Score + " <= " + config.threshold + " AND " + Score + " > -1")
 
