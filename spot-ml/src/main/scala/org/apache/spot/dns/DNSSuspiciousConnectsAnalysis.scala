@@ -27,13 +27,12 @@ object DNSSuspiciousConnectsAnalysis {
     * @param sqlContext
     * @param logger
     */
-  def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger) = {
+  def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger,
+          inputDataFrame: DataFrame) = {
+
     logger.info("Starting DNS suspicious connects analysis.")
 
-
-    logger.info("Loading data from: " + config.inputPath)
-
-    val rawDataDF = sqlContext.read.parquet(config.inputPath)
+    val cleanDataDF = inputDataFrame
       .filter(InputFilter)
       .select(InSchema:_*)
       .na.fill("unknown", Seq(QueryClass))
@@ -43,13 +42,16 @@ object DNSSuspiciousConnectsAnalysis {
     logger.info("Training the model")
 
     val model =
-      DNSSuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, rawDataDF, config.topicCount)
+      DNSSuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, cleanDataDF, config.topicCount)
 
     logger.info("Scoring")
-    val scoredDF = model.score(sparkContext, sqlContext, rawDataDF)
+    val scoredDF = model.score(sparkContext, sqlContext, cleanDataDF)
 
     val filteredDF = scoredDF.filter(Score + " <= " + config.threshold + " AND " + Score + " > -1")
-    val mostSuspiciousDF: DataFrame = filteredDF.orderBy(Score).limit(config.maxResults)
+
+    val orderedDF = filteredDF.orderBy(Score)
+
+    val mostSuspiciousDF = if(config.maxResults > 0)  orderedDF.limit(config.maxResults) else orderedDF
 
     val outputDF = mostSuspiciousDF.select(OutSchema:_*).sort(Score)
 
@@ -57,7 +59,7 @@ object DNSSuspiciousConnectsAnalysis {
     logger.info("Saving results to : " + config.hdfsScoredConnect)
     outputDF.map(_.mkString(config.outputDelimiter)).saveAsTextFile(config.hdfsScoredConnect)
 
-    val invalidRecords = sqlContext.read.parquet(config.inputPath)
+    val invalidRecords = inputDataFrame
       .filter(InvalidRecordsFilter)
       .select(InSchema:_*)
 

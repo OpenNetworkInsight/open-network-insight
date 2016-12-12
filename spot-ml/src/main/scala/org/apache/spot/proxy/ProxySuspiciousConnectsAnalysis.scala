@@ -4,7 +4,7 @@ import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StructType, _}
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spot.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.apache.spot.proxy.ProxySchema._
 import org.apache.spot.utilities.data.validation.{InvalidDataHandler => dataValidation}
@@ -22,13 +22,12 @@ object ProxySuspiciousConnectsAnalysis {
     * @param sqlContext   Spark SQL context.
     * @param logger       Logs execution progress, information and errors for user.
     */
-  def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger) = {
+  def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger,
+           inputDataFrame: DataFrame) = {
 
     logger.info("Starting proxy suspicious connects analysis.")
 
-    logger.info("Loading data from: " + config.inputPath)
-
-    val rawDataDF = sqlContext.read.parquet(config.inputPath)
+    val cleanDataDF = inputDataFrame
       .filter(InputFilter)
       .select(InSchema:_*)
       .na.fill("-", Seq(UserAgent))
@@ -36,16 +35,19 @@ object ProxySuspiciousConnectsAnalysis {
 
     logger.info("Training the model")
     val model =
-      ProxySuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, rawDataDF)
+      ProxySuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, cleanDataDF)
 
     logger.info("Scoring")
-    val scoredDF = model.score(sparkContext, rawDataDF)
+    val scoredDF = model.score(sparkContext, cleanDataDF)
 
     // take the maxResults least probable events of probability below the threshold and sort
 
     val filteredDF = scoredDF
       .filter(Score +  " <= " + config.threshold + " AND " + Score + " > -1 ")
-    val mostSuspiciousDF = filteredDF.orderBy(Score).limit(config.maxResults)
+
+    val orderedDF = filteredDF.orderBy(Score)
+
+    val mostSuspiciousDF = if(config.maxResults > 0)  orderedDF.limit(config.maxResults) else orderedDF
 
     val outputDF = mostSuspiciousDF.select(OutSchema:_*)
 
@@ -53,7 +55,7 @@ object ProxySuspiciousConnectsAnalysis {
     logger.info("Saving results to: " + config.hdfsScoredConnect)
     outputDF.map(_.mkString(config.outputDelimiter)).saveAsTextFile(config.hdfsScoredConnect)
 
-    val invalidRecords = sqlContext.read.parquet(config.inputPath)
+    val invalidRecords = inputDataFrame
       .filter(InvalidRecordsFilter)
       .select(InSchema:_*)
     dataValidation.showAndSaveInvalidRecords(invalidRecords, config.hdfsScoredConnect, logger)

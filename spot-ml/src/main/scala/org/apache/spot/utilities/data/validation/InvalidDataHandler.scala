@@ -1,7 +1,7 @@
 package org.apache.spot.utilities.data.validation
 
-import org.apache.spark.sql.DataFrame
 import org.apache.log4j.Logger
+import org.apache.spark.sql.DataFrame
 
 /**
   * Handles invalid and corrupt records.

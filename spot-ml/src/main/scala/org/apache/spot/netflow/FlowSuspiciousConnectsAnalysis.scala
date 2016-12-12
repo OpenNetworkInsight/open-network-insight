@@ -17,26 +17,29 @@ import org.apache.spot.utilities.data.validation.{InvalidDataHandler => dataVali
 
 object FlowSuspiciousConnectsAnalysis {
 
-  def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger)
-         (implicit outputDelimiter: String) = {
+  def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext,
+          logger: Logger, inputDataFrame: DataFrame) (implicit outputDelimiter: String) = {
 
-    logger.info("Loading data")
+    logger.info("Starting flow suspicious connects analysis.")
 
-    val rawDataDF = sqlContext.read.parquet(config.inputPath)
+    val cleanDataDF = inputDataFrame
       .filter(InputFilter)
       .select(InSchema: _*)
 
     logger.info("Training the model")
 
     val model =
-      FlowSuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, rawDataDF, config.topicCount)
+      FlowSuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, cleanDataDF, config.topicCount)
 
     logger.info("Scoring")
-    val scoredDF = model.score(sparkContext, sqlContext, rawDataDF)
+    val scoredDF = model.score(sparkContext, sqlContext, cleanDataDF)
 
     val filteredDF = scoredDF
       .filter(Score + " <= " + config.threshold + " AND " + Score + " > -1 ")
-    val mostSuspiciousDF: DataFrame = filteredDF.orderBy(Score).limit(config.maxResults)
+
+    val orderedDF = filteredDF.orderBy(Score)
+
+    val mostSuspiciousDF = if(config.maxResults > 0 ) orderedDF.limit(config.maxResults) else orderedDF
 
     val outputDF = mostSuspiciousDF.select(OutSchema: _*)
 
@@ -44,7 +47,7 @@ object FlowSuspiciousConnectsAnalysis {
     logger.info("Saving results to : " + config.hdfsScoredConnect)
     outputDF.map(_.mkString(config.outputDelimiter)).saveAsTextFile(config.hdfsScoredConnect)
 
-    val invalidRecords = sqlContext.read.parquet(config.inputPath)
+    val invalidRecords = inputDataFrame
       .filter(InvalidRecordsFilter)
       .select(InSchema: _*)
     dataValidation.showAndSaveInvalidRecords(invalidRecords, config.hdfsScoredConnect, logger)
