@@ -24,7 +24,7 @@ object InputOutputDataHandler {
     }
   }
 
-  def uploadResultsFile(sparkContext: SparkContext, hdfsScoredConnect: String, analysis: String, logger: Logger) {
+  def mergeResultsFiles(sparkContext: SparkContext, hdfsScoredConnect: String, analysis: String, logger: Logger) {
     val hadoopConfiguration = sparkContext.hadoopConfiguration
     val fileSystem = org.apache.hadoop.fs.FileSystem.get(hadoopConfiguration)
 

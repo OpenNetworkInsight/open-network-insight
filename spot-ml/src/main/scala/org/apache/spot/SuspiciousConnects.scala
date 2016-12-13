@@ -55,7 +55,7 @@ object SuspiciousConnects {
           case _ => logger.error("Unsupported (or misspelled) analysis: " + analysis)
         }
 
-        InputOutputDataHandler.uploadResultsFile(sparkContext, config.hdfsScoredConnect, analysis, logger)
+        InputOutputDataHandler.mergeResultsFiles(sparkContext, config.hdfsScoredConnect, analysis, logger)
 
         sparkContext.stop()
 
