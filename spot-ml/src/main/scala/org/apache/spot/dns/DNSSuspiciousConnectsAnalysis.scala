@@ -32,6 +32,8 @@ object DNSSuspiciousConnectsAnalysis {
 
     logger.info("Starting DNS suspicious connects analysis.")
 
+    val userDomain = config.userDomain
+
     val cleanDataDF = inputDataFrame
       .filter(InputFilter)
       .select(InSchema:_*)
