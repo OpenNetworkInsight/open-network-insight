@@ -61,10 +61,14 @@ class FlowScoreFunction(timeCuts: Array[Double],
 
     val zeroProb = Array.fill(topicCount) { 0.0 }
 
-    /** A null value for srcTopicMix or dstTopicMix indicated the ip (source or dest respectively)
+    /** word_error indicates there was a problem creating a word and should not be used for scoring.
+
+      A null value for srcTopicMix or dstTopicMix indicated the ip (source or dest respectively)
       * were not seen in training.
       */
-    if (srcTopicMix == null || dstTopicMix == null) {
+    if(srcWord == "word_error" || dstWord == "word_error"){
+      -1d
+    } else if (srcTopicMix == null || dstTopicMix == null) {
        0.0
     } else {
 

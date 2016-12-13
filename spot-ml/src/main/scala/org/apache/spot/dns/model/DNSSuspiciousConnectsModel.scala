@@ -15,6 +15,8 @@ import org.apache.spot.lda.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
 import org.apache.spot.utilities.DomainProcessor.DomainInfo
 import org.apache.spot.utilities.{CountryCodes, DomainProcessor, Quantiles, TopDomains}
 
+import scala.util.{Failure, Success, Try}
+
 
 /**
   * A probabilistic model of the DNS queries issued by each client IP.
@@ -164,22 +166,70 @@ object DNSSuspiciousConnectsModel {
 
     // create quantile cut-offs
 
-    val timeCuts = Quantiles.computeDeciles(totalDataDF.select(UnixTimestamp).rdd.
-      map({ case Row(unixTimeStamp: Long) => unixTimeStamp.toDouble }))
+    val timeCuts =
+      Quantiles.computeDeciles(totalDataDF
+        .select(UnixTimestamp)
+        .rdd
+        .flatMap({ case Row(unixTimeStamp: Long) => {
+          Try {unixTimeStamp.toDouble} match {
+              case Failure(_) => Seq()
+              case Success(map) => Seq(map)
+            }
+          }
+        }))
 
-    val frameLengthCuts = Quantiles.computeDeciles(totalDataDF.select(FrameLength).rdd
-      .map({ case Row(frameLen: Int) => frameLen.toDouble }))
+    val frameLengthCuts =
+      Quantiles.computeDeciles(totalDataDF
+        .select(FrameLength)
+        .rdd
+        .flatMap({case Row(frameLen: Int) => {
+            Try{frameLen.toDouble} match{
+              case Failure(_) => Seq()
+              case Success(map) => Seq(map)
+            }
+          }
+        }))
 
     val domainStatsDF = createDomainStatsDF(sparkContext, sqlContext, countryCodesBC, topDomainsBC, userDomain, totalDataDF)
 
-    val subdomainLengthCuts = Quantiles.computeQuintiles(domainStatsDF.filter(SubdomainLength + " > 0")
-      .select(SubdomainLength).rdd.map({ case Row(subdomainLength: Int) => subdomainLength.toDouble }))
+    val subdomainLengthCuts =
+      Quantiles.computeQuintiles(domainStatsDF
+        .filter(SubdomainLength + " > 0")
+        .select(SubdomainLength)
+        .rdd
+        .flatMap({ case Row(subdomainLength: Int) => {
+            Try{subdomainLength.toDouble} match {
+              case Failure(_) => Seq()
+              case Success(map) => Seq(map)
+            }
+          }
+        }))
 
-    val entropyCuts = Quantiles.computeQuintiles(domainStatsDF.filter(SubdomainEntropy + " > 0")
-      .select(SubdomainEntropy).rdd.map({ case Row(subdomainEntropy: Double) => subdomainEntropy }))
+    val entropyCuts =
+      Quantiles.computeQuintiles(domainStatsDF
+        .filter(SubdomainEntropy + " > 0")
+        .select(SubdomainEntropy)
+        .rdd
+        .flatMap({ case Row(subdomainEntropy: Double) => {
+          Try{subdomainEntropy.toDouble} match {
+            case Failure(_) => Seq()
+            case Success(map) => Seq(map)
+            }
+          }
+        }))
 
-    val numberPeriodsCuts = Quantiles.computeQuintiles(domainStatsDF.filter(NumPeriods + " > 0")
-      .select(NumPeriods).rdd.map({ case Row(numberPeriods: Int) => numberPeriods.toDouble }))
+    val numberPeriodsCuts =
+      Quantiles.computeQuintiles(domainStatsDF
+        .filter(NumPeriods + " > 0")
+        .select(NumPeriods)
+        .rdd
+        .flatMap({ case Row(numberPeriods: Int) => {
+          Try {numberPeriods.toDouble} match {
+            case Failure(_) => Seq()
+            case Success(map) => Seq(map)
+            }
+          }
+        }))
 
     // simplify DNS log entries into "words"
 
@@ -195,7 +245,10 @@ object DNSSuspiciousConnectsModel {
 
     // aggregate per-word counts at each IP
     val ipDstWordCounts =
-      dataWithWordDF.select(ClientIP, Word).map({ case Row(destIP: String, word: String) => (destIP, word) -> 1 })
+      dataWithWordDF
+        .select(ClientIP, Word)
+        .filter(Word + " <> 'word_error'")
+        .map({ case Row(destIP: String, word: String) => (destIP, word) -> 1 })
         .reduceByKey(_ + _)
         .map({ case ((ipDst, word), count) => SpotLDAInput(ipDst, word, count) })
 
@@ -251,6 +304,7 @@ object DNSSuspiciousConnectsModel {
                           topDomainsBC: Broadcast[Set[String]],
                           userDomain: String,
                           inDF: DataFrame): DataFrame = {
+
     val queryNameIndex = inDF.schema.fieldNames.indexOf(QueryName)
 
     val domainStatsRDD: RDD[Row] = inDF.rdd.map(row =>
