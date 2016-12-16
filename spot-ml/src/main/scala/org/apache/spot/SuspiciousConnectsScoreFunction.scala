@@ -1,6 +1,7 @@
 package org.apache.spot
 
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spot.utilities.data.validation.InvalidDataHandler
 
 
 
@@ -12,8 +13,8 @@ class SuspiciousConnectsScoreFunction(topicCount: Int,
 
     val zeroProb = Array.fill(topicCount) { 0d }
 
-    if(word == "word_error"){
-      -1d
+    if(word == InvalidDataHandler.WordError){
+      InvalidDataHandler.ScoreError
     } else {
       // If either the ip or the word key value cannot be found it means that it was not seen in training.
       val topicGivenDocProbs = ipToTopicMixBC.value.getOrElse(ip, zeroProb)

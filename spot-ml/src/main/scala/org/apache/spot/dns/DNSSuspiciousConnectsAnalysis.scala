@@ -28,49 +28,136 @@ object DNSSuspiciousConnectsAnalysis {
     * @param logger
     */
   def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger,
-          inputDataFrame: DataFrame) = {
+          inputDNSRecords: DataFrame) = {
 
     logger.info("Starting DNS suspicious connects analysis.")
 
     val userDomain = config.userDomain
 
-    val cleanDataDF = inputDataFrame
-      .filter(InputFilter)
-      .select(InSchema:_*)
-      .na.fill("unknown", Seq(QueryClass))
-      .na.fill(-1, Seq(QueryType))
-      .na.fill(-1, Seq(QueryResponseCode))
+    val cleanDNSRecords = filterAndSelectCleanDNSRecords(inputDNSRecords)
 
     logger.info("Training the model")
 
     val model =
-      DNSSuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, cleanDataDF, config.topicCount)
+      DNSSuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, cleanDNSRecords, config.topicCount)
 
     logger.info("Scoring")
-    val scoredDF = model.score(sparkContext, sqlContext, cleanDataDF, userDomain)
+    val scoredDNSRecords = model.score(sparkContext, sqlContext, cleanDNSRecords, userDomain)
 
-    val filteredDF = scoredDF.filter(Score + " <= " + config.threshold + " AND " + Score + " > -1")
+    val filteredDNSRecords = filterScoredDNSRecords(scoredDNSRecords, config.threshold)
 
-    val orderedDF = filteredDF.orderBy(Score)
+    val orderedDNSRecords = filteredDNSRecords.orderBy(Score)
 
-    val mostSuspiciousDF = if(config.maxResults > 0)  orderedDF.limit(config.maxResults) else orderedDF
+    val mostSuspiciousDNSRecords = if(config.maxResults > 0)  orderedDNSRecords.limit(config.maxResults) else orderedDNSRecords
 
-    val outputDF = mostSuspiciousDF.select(OutSchema:_*).sort(Score)
+    val outputDNSRecords = mostSuspiciousDNSRecords.select(OutSchema:_*).sort(Score)
 
     logger.info("DNS  suspicious connects analysis completed.")
     logger.info("Saving results to : " + config.hdfsScoredConnect)
-    outputDF.map(_.mkString(config.outputDelimiter)).saveAsTextFile(config.hdfsScoredConnect)
+    outputDNSRecords.map(_.mkString(config.outputDelimiter)).saveAsTextFile(config.hdfsScoredConnect)
 
-    val invalidRecords = inputDataFrame
-      .filter(InvalidRecordsFilter)
-      .select(InSchema:_*)
+    val invalidDNSRecords = filterAndSelectInvalidDNSRecords(inputDNSRecords)
+    dataValidation.showAndSaveInvalidRecords(invalidDNSRecords, config.hdfsScoredConnect, logger)
 
-    dataValidation.showAndSaveInvalidRecords(invalidRecords, config.hdfsScoredConnect, logger)
-
-    val corruptRecords = scoredDF.filter(Score + " = -1")
-    dataValidation.showAndSaveCorruptRecords(corruptRecords, config.hdfsScoredConnect, logger)
+    val corruptDNSRecords = filterAndSelectCorruptDNSRecords(scoredDNSRecords)
+    dataValidation.showAndSaveCorruptRecords(corruptDNSRecords, config.hdfsScoredConnect, logger)
   }
 
+  /**
+    *
+    * @param inputDNSRecords raw DNS records.
+    * @return
+    */
+  def filterAndSelectCleanDNSRecords(inputDNSRecords: DataFrame): DataFrame ={
+
+    val cleanDNSRecordsFilter = inputDNSRecords(Timestamp).isNotNull &&
+      inputDNSRecords(Timestamp).notEqual("") &&
+      inputDNSRecords(Timestamp).notEqual("-") &&
+      inputDNSRecords(UnixTimestamp).isNotNull &&
+      inputDNSRecords(FrameLength).isNotNull &&
+      inputDNSRecords(QueryName).isNotNull &&
+      inputDNSRecords(QueryName).notEqual("") &&
+      inputDNSRecords(QueryName).notEqual("-") &&
+      inputDNSRecords(QueryName).notEqual("(empty)") &&
+      inputDNSRecords(ClientIP).isNotNull &&
+      inputDNSRecords(ClientIP).notEqual("") &&
+      inputDNSRecords(ClientIP).notEqual("-") &&
+      ((inputDNSRecords(QueryClass).isNotNull &&
+        inputDNSRecords(QueryClass).notEqual("") &&
+        inputDNSRecords(QueryClass).notEqual("-")) ||
+        inputDNSRecords(QueryType).isNotNull ||
+        inputDNSRecords(QueryResponseCode).isNotNull)
+
+    inputDNSRecords
+      .filter(cleanDNSRecordsFilter)
+      .select(InSchema: _*)
+      .na.fill(DefaultQueryClass, Seq(QueryClass))
+      .na.fill(DefaultQueryType, Seq(QueryType))
+      .na.fill(DefaultQueryResponseCode, Seq(QueryResponseCode))
+  }
+
+  /**
+    *
+    * @param inputDNSRecords raw DNS records.
+    * @return
+    */
+  def filterAndSelectInvalidDNSRecords(inputDNSRecords: DataFrame): DataFrame ={
+
+    val invalidDNSRecordsFilter = inputDNSRecords(Timestamp).isNull ||
+      inputDNSRecords(Timestamp).equalTo("") ||
+      inputDNSRecords(Timestamp).equalTo("-") ||
+      inputDNSRecords(UnixTimestamp).isNull ||
+      inputDNSRecords(FrameLength).isNull ||
+      inputDNSRecords(QueryName).isNull ||
+      inputDNSRecords(QueryName).equalTo("") ||
+      inputDNSRecords(QueryName).equalTo("-") ||
+      inputDNSRecords(QueryName).equalTo("(empty)") ||
+      inputDNSRecords(ClientIP).isNull ||
+      inputDNSRecords(ClientIP).equalTo("") ||
+      inputDNSRecords(ClientIP).equalTo("-") ||
+      ((inputDNSRecords(QueryClass).isNull ||
+        inputDNSRecords(QueryClass).equalTo("") ||
+        inputDNSRecords(QueryClass).equalTo("-")) &&
+        inputDNSRecords(QueryType).isNull &&
+        inputDNSRecords(QueryResponseCode).isNull)
+
+    inputDNSRecords
+      .filter(invalidDNSRecordsFilter)
+      .select(InSchema: _*)
+  }
+
+  /**
+    *
+    * @param scoredDNSRecords scored DNS records.
+    * @param threshold score tolerance.
+    * @return
+    */
+  def filterScoredDNSRecords(scoredDNSRecords: DataFrame, threshold: Double): DataFrame ={
+
+    val filteredDNSRecordsFilter = scoredDNSRecords(Score).leq(threshold) &&
+      scoredDNSRecords(Score).gt(dataValidation.ScoreError)
+
+    scoredDNSRecords.filter(filteredDNSRecordsFilter)
+  }
+
+  /**
+    *
+    * @param scoredDNSRecords scored DNS records.
+    * @return
+    */
+  def filterAndSelectCorruptDNSRecords(scoredDNSRecords: DataFrame): DataFrame = {
+
+    val corruptDNSRecordsFilter = scoredDNSRecords(Score).equalTo(dataValidation.ScoreError)
+
+    scoredDNSRecords
+      .filter(corruptDNSRecordsFilter)
+      .select(OutSchema: _*)
+
+  }
+
+  val DefaultQueryClass = "unknown"
+  val DefaultQueryType = -1
+  val DefaultQueryResponseCode = -1
 
   val InStructType = StructType(List(TimestampField, UnixTimestampField, FrameLengthField, ClientIPField,
     QueryNameField, QueryClassField, QueryTypeField, QueryResponseCodeField))
@@ -89,22 +176,4 @@ object DNSSuspiciousConnectsAnalysis {
       QueryTypeField,
       QueryResponseCodeField,
       ScoreField)).fieldNames.map(col)
-
-  val InputFilter = s"($Timestamp IS NOT NULL AND $Timestamp <> '' AND $Timestamp <> '-') " +
-    s"AND ($UnixTimestamp  IS NOT NULL) " +
-    s"AND ($FrameLength IS NOT NULL) " +
-    s"AND ($QueryName IS NOT NULL AND $QueryName <> '' AND $QueryName <> '-' AND $QueryName <> '(empty)') " +
-    s"AND ($ClientIP IS NOT NULL AND $ClientIP <> '' AND $ClientIP <> '-') " +
-    s"AND (($QueryClass IS NOT NULL AND $QueryClass <> '' AND $QueryClass <> '-') " +
-    s"OR $QueryType IS NOT NULL " +
-    s"OR $QueryResponseCode IS NOT NULL)"
-
-  val InvalidRecordsFilter = s"($Timestamp IS NULL OR $Timestamp = '' OR $Timestamp = '-') " +
-    s"OR ($UnixTimestamp  IS NULL) " +
-    s"OR ($FrameLength IS NULL) " +
-    s"OR ($QueryName IS NULL OR $QueryName = '' OR $QueryName = '-' AND $QueryName = '(empty)') " +
-    s"OR ($ClientIP IS NULL OR $ClientIP = '' OR $ClientIP = '-') " +
-    s"OR (($QueryClass IS NULL OR $QueryClass = '' OR $QueryClass = '-') " +
-    s"AND $QueryType IS NULL " +
-    s"AND $QueryResponseCode IS NULL)"
 }

@@ -2,6 +2,7 @@ package org.apache.spot.proxy
 
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.functions._
+import org.apache.spot.utilities.data.validation.InvalidDataHandler
 import org.apache.spot.utilities.{DomainProcessor, Entropy, Quantiles, TimeUtilities}
 
 import scala.util.{Success, Try}
@@ -52,7 +53,7 @@ object ProxyWordCreation {
         if (responseCode != null) responseCode(0) else "unknown_response_code").mkString("_")
     } match {
       case Success(proxyWord) => proxyWord
-      case _ => "word_error"
+      case _ => InvalidDataHandler.WordError
     }
   }
 

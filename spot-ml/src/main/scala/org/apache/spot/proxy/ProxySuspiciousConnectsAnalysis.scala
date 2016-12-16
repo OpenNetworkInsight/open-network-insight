@@ -3,7 +3,7 @@ package org.apache.spot.proxy
 import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{StructType, _}
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spot.SuspiciousConnectsArgumentParser.SuspiciousConnectsConfig
 import org.apache.spot.proxy.ProxySchema._
@@ -23,47 +23,108 @@ object ProxySuspiciousConnectsAnalysis {
     * @param logger       Logs execution progress, information and errors for user.
     */
   def run(config: SuspiciousConnectsConfig, sparkContext: SparkContext, sqlContext: SQLContext, logger: Logger,
-           inputDataFrame: DataFrame) = {
+          inputProxyRecords: DataFrame) = {
 
     logger.info("Starting proxy suspicious connects analysis.")
 
-    val cleanDataDF = inputDataFrame
-      .filter(InputFilter)
-      .select(InSchema:_*)
-      .na.fill("-", Seq(UserAgent))
-      .na.fill("-", Seq(ResponseContentType))
+    val cleanProxyRecords = filterAndSelectCleanProxyRecords(inputProxyRecords)
 
     logger.info("Training the model")
     val model =
-      ProxySuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, cleanDataDF)
+      ProxySuspiciousConnectsModel.trainNewModel(sparkContext, sqlContext, logger, config, cleanProxyRecords)
 
     logger.info("Scoring")
-    val scoredDF = model.score(sparkContext, cleanDataDF)
+    val scoredProxyRecords = model.score(sparkContext, cleanProxyRecords)
 
     // take the maxResults least probable events of probability below the threshold and sort
 
-    val filteredDF = scoredDF
-      .filter(Score +  " <= " + config.threshold + " AND " + Score + " > -1 ")
+    val filteredProxyRecords = filterScoredProxyRecords(scoredProxyRecords, config.threshold)
 
-    val orderedDF = filteredDF.orderBy(Score)
+    val orderedProxyRecords = filteredProxyRecords.orderBy(Score)
 
-    val mostSuspiciousDF = if(config.maxResults > 0)  orderedDF.limit(config.maxResults) else orderedDF
+    val mostSuspiciousProxyRecords = if(config.maxResults > 0)  orderedProxyRecords.limit(config.maxResults) else orderedProxyRecords
 
-    val outputDF = mostSuspiciousDF.select(OutSchema:_*)
+    val outputProxyRecords = mostSuspiciousProxyRecords.select(OutSchema:_*)
 
     logger.info("Proxy suspicious connects analysis completed")
     logger.info("Saving results to: " + config.hdfsScoredConnect)
-    outputDF.map(_.mkString(config.outputDelimiter)).saveAsTextFile(config.hdfsScoredConnect)
+    outputProxyRecords.map(_.mkString(config.outputDelimiter)).saveAsTextFile(config.hdfsScoredConnect)
 
-    val invalidRecords = inputDataFrame
-      .filter(InvalidRecordsFilter)
-      .select(InSchema:_*)
-    dataValidation.showAndSaveInvalidRecords(invalidRecords, config.hdfsScoredConnect, logger)
+    val invalidProxyRecords = filterAndSelectInvalidProxyRecords(inputProxyRecords)
+    dataValidation.showAndSaveInvalidRecords(invalidProxyRecords, config.hdfsScoredConnect, logger)
 
-    val corruptRecords = scoredDF.filter(Score + " = -1")
-    dataValidation.showAndSaveCorruptRecords(corruptRecords, config.hdfsScoredConnect, logger)
+    val corruptProxyRecords = filterAndSelectCorruptProxyRecords(scoredProxyRecords)
+    dataValidation.showAndSaveCorruptRecords(corruptProxyRecords, config.hdfsScoredConnect, logger)
   }
 
+  /**
+    *
+    * @param inputProxyRecords raw proxy records.
+    * @return
+    */
+  def filterAndSelectCleanProxyRecords(inputProxyRecords: DataFrame): DataFrame ={
+
+    val cleanProxyRecordsFilter =  inputProxyRecords(Date).isNotNull &&
+      inputProxyRecords(Time).isNotNull &&
+      inputProxyRecords(ClientIP).isNotNull &&
+      inputProxyRecords(Host).isNotNull &&
+      inputProxyRecords(FullURI).isNotNull
+
+    inputProxyRecords
+      .filter(cleanProxyRecordsFilter)
+      .select(InSchema:_*)
+      .na.fill(DefaultUserAgent, Seq(UserAgent))
+      .na.fill(DefaultResponseContentType, Seq(ResponseContentType))
+  }
+
+  /**
+    *
+    * @param inputProxyRecords raw proxy records.
+    * @return
+    */
+  def filterAndSelectInvalidProxyRecords(inputProxyRecords: DataFrame): DataFrame ={
+
+    val invalidProxyRecordsFilter = inputProxyRecords(Date).isNull ||
+      inputProxyRecords(Time).isNull ||
+      inputProxyRecords(ClientIP).isNull ||
+      inputProxyRecords(Host).isNull ||
+      inputProxyRecords(FullURI).isNull
+
+    inputProxyRecords
+      .filter(invalidProxyRecordsFilter)
+      .select(InSchema: _*)
+  }
+
+  /**
+    *
+    * @param scoredProxyRecords scored proxy records.
+    * @param threshold score tolerance.
+    * @return
+    */
+  def filterScoredProxyRecords(scoredProxyRecords: DataFrame, threshold: Double): DataFrame ={
+
+    val filteredProxyRecordsFilter = scoredProxyRecords(Score).leq(threshold) &&
+      scoredProxyRecords(Score).gt(dataValidation.ScoreError)
+
+    scoredProxyRecords.filter(filteredProxyRecordsFilter)
+  }
+
+  /**
+    *
+    * @param scoredProxyRecords scored proxy records.
+    * @return
+    */
+  def filterAndSelectCorruptProxyRecords(scoredProxyRecords: DataFrame): DataFrame ={
+
+    val corruptProxyRecordsFilter = scoredProxyRecords(Score).equalTo(dataValidation.ScoreError)
+
+    scoredProxyRecords
+      .filter(corruptProxyRecordsFilter)
+      .select(OutSchema: _*)
+  }
+
+  val DefaultUserAgent = "-"
+  val DefaultResponseContentType = "-"
 
   val InSchema = StructType(
     List(DateField,
@@ -108,10 +169,4 @@ object ProxySuspiciousConnectsAnalysis {
       FullURIField,
       WordField,
       ScoreField)).fieldNames.map(col)
-
-  val InputFilter = s"$Date IS NOT NULL AND $Time  IS NOT NULL AND $ClientIP IS NOT NULL AND " +
-    s"$Host IS NOT NULL AND $FullURI IS NOT NULL"
-
-  val InvalidRecordsFilter = s"$Date IS NULL OR $Time  IS NULL OR $ClientIP IS NULL OR " +
-    s"$Host IS NULL OR $FullURI IS NULL"
 }

@@ -18,13 +18,9 @@ LPATH=${LUSER}/ml/${DSOURCE}/test
 HPATH=${HUSER}/${DSOURCE}/test/scored_results
 # prepare parameters pipeline stages
 
-
 FEEDBACK_PATH=${LPATH}/${DSOURCE}_scores.csv
-DUPFACTOR=1000
 
 HDFS_SCORED_CONNECTS=${HPATH}/scores
-
-TOPIC_COUNT=20
 
 mkdir -p ${LPATH}
 rm -f ${LPATH}/*.{dat,beta,gamma,other,pkl} # protect the flow_scores.csv file

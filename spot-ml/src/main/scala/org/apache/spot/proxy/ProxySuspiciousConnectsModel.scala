@@ -12,6 +12,7 @@ import org.apache.spot.utilities._
 import org.apache.spot.SuspiciousConnectsScoreFunction
 import org.apache.spot.lda.SpotLDAWrapper
 import org.apache.spot.lda.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
+import org.apache.spot.utilities.data.validation.InvalidDataHandler
 
 import scala.util.{Failure, Success, Try}
 
@@ -87,7 +88,7 @@ object ProxySuspiciousConnectsModel {
     * @param sqlContext   SQL context.
     * @param logger       Logge object.
     * @param config       SuspiciousConnetsArgumnetParser.Config object containg CLI arguments.
-    * @param inDF         Dataframe for training data, with columns Host, Time, ReqMethod, FullURI, ResponseContentType,
+    * @param inputRecords         Dataframe for training data, with columns Host, Time, ReqMethod, FullURI, ResponseContentType,
     *                     UserAgent, RespCode (as defined in ProxySchema object).
     * @return ProxySuspiciousConnectsModel
     */
@@ -95,39 +96,39 @@ object ProxySuspiciousConnectsModel {
                     sqlContext: SQLContext,
                     logger: Logger,
                     config: SuspiciousConnectsConfig,
-                    inDF: DataFrame): ProxySuspiciousConnectsModel = {
+                    inputRecords: DataFrame): ProxySuspiciousConnectsModel = {
 
     logger.info("training new proxy suspcious connects model")
 
 
-    val df = inDF.select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
+    val selectedRecords = inputRecords.select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
       .unionAll(ProxyFeedback.loadFeedbackDF(sparkContext, sqlContext, config.feedbackFile, config.duplicationFactor))
 
     val timeCuts =
-      Quantiles.computeDeciles(df
+      Quantiles.computeDeciles(selectedRecords
         .select(Time)
         .rdd
         .flatMap({ case Row(t: String) => {
             Try {TimeUtilities.getTimeAsDouble(t)} match {
               case Failure(_) => Seq()
-              case Success(map) =>  Seq(map)
+              case Success(time) =>  Seq(time)
             }
           }
         }))
 
-    val entropyCuts = Quantiles.computeQuintiles(df
+    val entropyCuts = Quantiles.computeQuintiles(selectedRecords
       .select(FullURI)
       .rdd
       .flatMap({ case Row(uri: String) => {
           Try {Entropy.stringEntropy(uri)} match {
             case Failure(_) => Seq()
-            case Success(map) => Seq(map)
+            case Success(entropy) => Seq(entropy)
           }
         }
       }))
 
     val agentToCount: Map[String, Long] =
-      df.select(UserAgent)
+      selectedRecords.select(UserAgent)
         .rdd
         .map({ case Row(agent: String) => (agent, 1L) })
         .reduceByKey(_ + _).collect()
@@ -136,13 +137,13 @@ object ProxySuspiciousConnectsModel {
     val agentToCountBC = sparkContext.broadcast(agentToCount)
 
     val agentCuts =
-      Quantiles.computeQuintiles(df
+      Quantiles.computeQuintiles(selectedRecords
         .select(UserAgent)
         .rdd
         .map({ case Row(agent: String) => agentToCountBC.value(agent) }))
 
     val docWordCount: RDD[SpotLDAInput] =
-      getIPWordCounts(sparkContext, sqlContext, logger, df, config.feedbackFile, config.duplicationFactor, agentToCount, timeCuts, entropyCuts, agentCuts)
+      getIPWordCounts(sparkContext, sqlContext, logger, selectedRecords, config.feedbackFile, config.duplicationFactor, agentToCount, timeCuts, entropyCuts, agentCuts)
 
 
     val SpotLDAOutput(ipToTopicMixDF, wordResults) = SpotLDAWrapper.runLDA(sparkContext,
@@ -181,7 +182,7 @@ object ProxySuspiciousConnectsModel {
   def getIPWordCounts(sc: SparkContext,
                       sqlContext: SQLContext,
                       logger: Logger,
-                      inDF: DataFrame,
+                      inputRecords: DataFrame,
                       feedbackFile: String,
                       duplicationFactor: Int,
                       agentToCount: Map[String, Long],
@@ -191,9 +192,9 @@ object ProxySuspiciousConnectsModel {
 
 
     logger.info("Read source data")
-    val df = inDF.select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
+    val selectedRecords = inputRecords.select(Date, Time, ClientIP, Host, ReqMethod, UserAgent, ResponseContentType, RespCode, FullURI)
 
-    val wc = ipWordCountFromDF(sc, df, agentToCount, timeCuts, entropyCuts, agentCuts)
+    val wc = ipWordCountFromDF(sc, selectedRecords, agentToCount, timeCuts, entropyCuts, agentCuts)
     logger.info("proxy pre LDA completed")
 
     wc
@@ -211,7 +212,7 @@ object ProxySuspiciousConnectsModel {
     val agentToCountBC = sc.broadcast(agentToCount)
     val udfWordCreation = ProxyWordCreation.udfWordCreation(topDomains, agentToCountBC, timeCuts, entropyCuts, agentCuts)
 
-    val ipWordDF = dataFrame.withColumn(Word,
+    val ipWord = dataFrame.withColumn(Word,
       udfWordCreation(dataFrame(Host),
         dataFrame(Time),
         dataFrame(ReqMethod),
@@ -220,9 +221,11 @@ object ProxySuspiciousConnectsModel {
         dataFrame(UserAgent),
         dataFrame(RespCode)))
       .select(ClientIP, Word)
-      .filter(Word + " <> 'word_error'")
 
-    ipWordDF.rdd.map({ case Row(ip, word) => ((ip.asInstanceOf[String], word.asInstanceOf[String]), 1) })
+    ipWord
+      .filter(ipWord(Word).notEqual(InvalidDataHandler.WordError))
+      .rdd
+      .map({ case Row(ip, word) => ((ip.asInstanceOf[String], word.asInstanceOf[String]), 1) })
       .reduceByKey(_ + _).map({ case ((ip, word), count) => SpotLDAInput(ip, word, count) })
   }
 }

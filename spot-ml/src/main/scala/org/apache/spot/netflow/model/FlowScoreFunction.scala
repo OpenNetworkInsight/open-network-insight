@@ -3,6 +3,7 @@ package org.apache.spot.netflow.model
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spot.SuspiciousConnectsScoreFunction
 import org.apache.spot.netflow.{FlowWordCreator, FlowWords}
+import org.apache.spot.utilities.data.validation.InvalidDataHandler
 
 
 /**
@@ -66,8 +67,8 @@ class FlowScoreFunction(timeCuts: Array[Double],
       A null value for srcTopicMix or dstTopicMix indicated the ip (source or dest respectively)
       * were not seen in training.
       */
-    if(srcWord == "word_error" || dstWord == "word_error"){
-      -1d
+    if(srcWord == InvalidDataHandler.WordError || dstWord == InvalidDataHandler.WordError){
+      InvalidDataHandler.ScoreError
     } else if (srcTopicMix == null || dstTopicMix == null) {
        0.0
     } else {

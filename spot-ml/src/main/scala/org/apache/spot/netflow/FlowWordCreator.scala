@@ -2,6 +2,8 @@ package org.apache.spot.netflow
 
 import org.apache.spark.sql.functions._
 import org.apache.spot.utilities.Quantiles
+import org.apache.spot.utilities.data.validation.InvalidDataHandler
+
 import scala.util.{Failure, Success, Try}
 
 
@@ -123,7 +125,7 @@ class FlowWordCreator(timeCuts: Array[Double],
 
     }match {
       case Success(flowWords) => flowWords
-      case _ => FlowWords("word_error", "word_error")
+      case _ => FlowWords(InvalidDataHandler.WordError, InvalidDataHandler.WordError)
     }
   }
 

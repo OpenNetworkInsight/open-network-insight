@@ -4,6 +4,7 @@ import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.functions._
 import org.apache.spot.utilities.DomainProcessor.{DomainInfo, extractDomainInfo}
 import org.apache.spot.utilities.Quantiles
+import org.apache.spot.utilities.data.validation.InvalidDataHandler
 
 import scala.util.{Failure, Success, Try}
 
@@ -95,7 +96,7 @@ class DNSWordCreation(frameLengthCuts: Array[Double],
         dnsQueryRcode).mkString("_")
     } match {
       case Success(word) => word
-      case _ => "word_error"
+      case _ => InvalidDataHandler.WordError
     }
 
   }

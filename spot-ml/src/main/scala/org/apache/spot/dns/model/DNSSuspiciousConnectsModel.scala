@@ -13,6 +13,7 @@ import org.apache.spot.dns.DNSWordCreation
 import org.apache.spot.lda.SpotLDAWrapper
 import org.apache.spot.lda.SpotLDAWrapper.{SpotLDAInput, SpotLDAOutput}
 import org.apache.spot.utilities.DomainProcessor.DomainInfo
+import org.apache.spot.utilities.data.validation.InvalidDataHandler
 import org.apache.spot.utilities.{CountryCodes, DomainProcessor, Quantiles, TopDomains}
 
 import scala.util.{Failure, Success, Try}
@@ -140,7 +141,7 @@ object DNSSuspiciousConnectsModel {
     * @param logger
     * @param config     Analysis configuration object containing CLI parameters.
     *                   Contains the path to the feedback file in config.scoresFile
-    * @param inDF       Data used to train the model.
+    * @param inputRecords       Data used to train the model.
     * @param topicCount Number of topics (traffic profiles) used to build the model.
     * @return A new [[DNSSuspiciousConnectsModel]] instance trained on the dataframe and feedback file.
     */
@@ -148,14 +149,14 @@ object DNSSuspiciousConnectsModel {
                     sqlContext: SQLContext,
                     logger: Logger,
                     config: SuspiciousConnectsConfig,
-                    inDF: DataFrame,
+                    inputRecords: DataFrame,
                     topicCount: Int): DNSSuspiciousConnectsModel = {
 
     logger.info("Training DNS suspicious connects model from " + config.inputPath)
 
-    val selectedDF = inDF.select(modelColumns: _*)
+    val selectedRecords = inputRecords.select(modelColumns: _*)
 
-    val totalDataDF = selectedDF.unionAll(DNSFeedback.loadFeedbackDF(sparkContext,
+    val totalRecords = selectedRecords.unionAll(DNSFeedback.loadFeedbackDF(sparkContext,
       sqlContext,
       config.feedbackFile,
       config.duplicationFactor))
@@ -167,66 +168,66 @@ object DNSSuspiciousConnectsModel {
     // create quantile cut-offs
 
     val timeCuts =
-      Quantiles.computeDeciles(totalDataDF
+      Quantiles.computeDeciles(totalRecords
         .select(UnixTimestamp)
         .rdd
         .flatMap({ case Row(unixTimeStamp: Long) => {
           Try {unixTimeStamp.toDouble} match {
               case Failure(_) => Seq()
-              case Success(map) => Seq(map)
+              case Success(timestamp) => Seq(timestamp)
             }
           }
         }))
 
     val frameLengthCuts =
-      Quantiles.computeDeciles(totalDataDF
+      Quantiles.computeDeciles(totalRecords
         .select(FrameLength)
         .rdd
         .flatMap({case Row(frameLen: Int) => {
             Try{frameLen.toDouble} match{
               case Failure(_) => Seq()
-              case Success(map) => Seq(map)
+              case Success(frameLen) => Seq(frameLen)
             }
           }
         }))
 
-    val domainStatsDF = createDomainStatsDF(sparkContext, sqlContext, countryCodesBC, topDomainsBC, userDomain, totalDataDF)
+    val domainStatsRecords = createDomainStatsDF(sparkContext, sqlContext, countryCodesBC, topDomainsBC, userDomain, totalRecords)
 
     val subdomainLengthCuts =
-      Quantiles.computeQuintiles(domainStatsDF
-        .filter(SubdomainLength + " > 0")
+      Quantiles.computeQuintiles(domainStatsRecords
+        .filter(domainStatsRecords(SubdomainLength).gt(0))
         .select(SubdomainLength)
         .rdd
         .flatMap({ case Row(subdomainLength: Int) => {
             Try{subdomainLength.toDouble} match {
               case Failure(_) => Seq()
-              case Success(map) => Seq(map)
+              case Success(subdomainLength) => Seq(subdomainLength)
             }
           }
         }))
 
     val entropyCuts =
-      Quantiles.computeQuintiles(domainStatsDF
-        .filter(SubdomainEntropy + " > 0")
+      Quantiles.computeQuintiles(domainStatsRecords
+        .filter(domainStatsRecords(SubdomainEntropy).gt(0))
         .select(SubdomainEntropy)
         .rdd
         .flatMap({ case Row(subdomainEntropy: Double) => {
           Try{subdomainEntropy.toDouble} match {
             case Failure(_) => Seq()
-            case Success(map) => Seq(map)
+            case Success(subdomainEntropy) => Seq(subdomainEntropy)
             }
           }
         }))
 
     val numberPeriodsCuts =
-      Quantiles.computeQuintiles(domainStatsDF
-        .filter(NumPeriods + " > 0")
+      Quantiles.computeQuintiles(domainStatsRecords
+        .filter(domainStatsRecords(NumPeriods).gt(0))
         .select(NumPeriods)
         .rdd
         .flatMap({ case Row(numberPeriods: Int) => {
           Try {numberPeriods.toDouble} match {
             case Failure(_) => Seq()
-            case Success(map) => Seq(map)
+            case Success(numberPeriods) => Seq(numberPeriods)
             }
           }
         }))
@@ -241,13 +242,13 @@ object DNSSuspiciousConnectsModel {
                                              topDomainsBC,
                                              userDomain)
 
-    val dataWithWordDF = totalDataDF.withColumn(Word, dnsWordCreator.wordCreationUDF(modelColumns: _*))
+    val dataWithWord = totalRecords.withColumn(Word, dnsWordCreator.wordCreationUDF(modelColumns: _*))
 
     // aggregate per-word counts at each IP
     val ipDstWordCounts =
-      dataWithWordDF
+      dataWithWord
         .select(ClientIP, Word)
-        .filter(Word + " <> 'word_error'")
+        .filter(dataWithWord(Word).notEqual(InvalidDataHandler.WordError))
         .map({ case Row(destIP: String, word: String) => (destIP, word) -> 1 })
         .reduceByKey(_ + _)
         .map({ case ((ipDst, word), count) => SpotLDAInput(ipDst, word, count) })

@@ -9,6 +9,15 @@ import org.apache.spark.sql.DataFrame
   */
 object InvalidDataHandler {
 
+  val WordError = "word_error"
+  val ScoreError = -1d
+
+  /**
+    *
+    * @param invalidRecords Records with null or invalid values in key columns.
+    * @param outputPath HDFS output folder for invalid records; scored_results/date/scores/invalid
+    * @param logger Application logger.
+    */
   def showAndSaveInvalidRecords(invalidRecords: DataFrame, outputPath: String, logger: Logger) {
 
     if (invalidRecords.count > 0) {
@@ -23,6 +32,13 @@ object InvalidDataHandler {
     }
   }
 
+  /**
+    *
+    * @param corruptRecords Records with Score = -1. This means that during word creation these records throw an exception
+    *                       and they got assigned the word word_error and hence during scoring they got a score -1.
+    * @param outputPath HDFS output folder for corrupt records; scored_results/date/scores/corrupt
+    * @param logger Application logger.
+    */
   def showAndSaveCorruptRecords(corruptRecords: DataFrame, outputPath: String, logger: Logger) {
     if(corruptRecords.count > 0){
 
