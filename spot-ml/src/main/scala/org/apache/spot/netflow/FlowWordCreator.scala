@@ -123,7 +123,7 @@ class FlowWordCreator(timeCuts: Array[Double],
         FlowWords(srcWord = baseWord, dstWord = baseWord)
       }
 
-    }match {
+    } match {
       case Success(flowWords) => flowWords
       case _ => FlowWords(InvalidDataHandler.WordError, InvalidDataHandler.WordError)
     }

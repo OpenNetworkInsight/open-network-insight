@@ -62,7 +62,7 @@ class FlowScoreFunction(timeCuts: Array[Double],
 
     val zeroProb = Array.fill(topicCount) { 0.0 }
 
-    /** word_error indicates there was a problem creating a word and should not be used for scoring.
+    /** WordError indicates there was a problem creating a word and should not be used for scoring.
 
       A null value for srcTopicMix or dstTopicMix indicated the ip (source or dest respectively)
       * were not seen in training.

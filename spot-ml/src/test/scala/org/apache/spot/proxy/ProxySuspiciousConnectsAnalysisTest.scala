@@ -1,10 +1,8 @@
-package org.apache.spot
+package org.apache.spot.proxy
 
-import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.Row
+import org.apache.spark.sql.{Row, SQLContext}
 import org.apache.spark.sql.types.StructType
 import org.apache.spot.proxy.ProxySchema._
-import org.apache.spot.proxy.ProxySuspiciousConnectsAnalysis
 import org.apache.spot.testutils.TestingSparkContextFlatSpec
 import org.scalatest.Matchers
 
