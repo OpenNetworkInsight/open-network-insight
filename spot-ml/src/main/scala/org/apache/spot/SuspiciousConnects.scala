@@ -46,7 +46,11 @@ object SuspiciousConnects {
 
         val inputDataFrame = InputOutputDataHandler.getInputDataFrame(sqlContext, config.inputPath, logger)
           .getOrElse(sqlContext.emptyDataFrame)
-        if(inputDataFrame.rdd.isEmpty()) System.exit(0)
+        if(inputDataFrame.rdd.isEmpty()) {
+          logger.error("Couldn't read data from location " + config.inputPath +", please verify it's a valid location and that " +
+            s"contains parquet files with a given schema and try again.")
+          System.exit(0)
+        }
 
         analysis match {
           case "flow" => FlowSuspiciousConnectsAnalysis.run(config, sparkContext, sqlContext, logger, inputDataFrame)
