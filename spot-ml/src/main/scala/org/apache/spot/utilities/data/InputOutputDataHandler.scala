@@ -25,8 +25,6 @@ object InputOutputDataHandler {
       Some(sqlContext.read.parquet(inputPath))
     } catch {
       case _ : Throwable => {
-        logger.error(s"Couldn't read data from location $inputPath, please verify it's a valid location and that " +
-          s"contains parquet files with a given schema and try again.")
         None
       }
     }
