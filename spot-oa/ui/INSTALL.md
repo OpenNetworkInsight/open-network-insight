@@ -11,15 +11,25 @@ Here you will find instructions to get Spot UI up and running. For more informat
 - spot-oa output
 > Spot UI takes any output from [spot-oa backend](../oa/), as input for the visualization tools provided. Please make sure there are files available under PATH_TO_SPOT/ui/data/${PIPELINE}/${DATE}/
 
-## Install Spot UI
+## Install Spot UI - Production
 
 1. Go to Spot UI folder
 
-	`$ cd PATH_TO_SPOT/ui/`
+	`$ cd PATH_TO_SPOT/spot-oa/ui/`
 
-2. With root privileges, install browserify and uglify as global commands on your system.
+2. Install dependencies and build Spot UI
 
-	`# npm install -g browserify uglifyjs`
+	`$ npm install`
+
+## Install Spot UI - Development
+
+1. Go to Spot UI folder
+
+	`$ cd PATH_TO_SPOT/spot-oa/ui/`
+
+2. With root privileges, install watchify [link](https://www.npmjs.com/package/watchify) as global commands on your system.
+
+	`# npm install -g watchify`
 
 3. Install dependencies and build Spot UI
 
@@ -27,9 +37,9 @@ Here you will find instructions to get Spot UI up and running. For more informat
 
 ## How to run Spot UI
 
-1. Go to Spot UI folder
+1. Go to Spot OA folder
 
-	`$ cd PATH_TO_SPOT/`
+	`$ cd PATH_TO_SPOT/spot-oa`
 
 2. Start the web server
 
